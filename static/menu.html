@@ -1719,7 +1719,7 @@
 
 
     <!-- =====================================================
-         CUSTOMER LOGIN MODAL (MOBILE OTP ENTRY)
+         CUSTOMER DETAILS
     ====================================================== -->
     <div id="loginModal" class="login-modal-overlay">
         <div class="login-modal-card">
@@ -1727,49 +1727,22 @@
             <h3>The Bong Connection</h3>
             <div class="bengali-welcome">শুভ শারদীয়া • স্বাগতম!</div>
 
-            <!-- STEP 1: Details & Send OTP -->
-            <div id="otpStep1">
-                <div class="desc">Enter your Name & Mobile Number to receive a login OTP.</div>
-                <form onsubmit="handleSendOTP(event)">
-                    <div class="form-group">
-                        <label for="loginName">Full Name / আপনার নাম *</label>
-                        <input type="text" id="loginName" class="login-input" placeholder="e.g. Rahul Sen" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="loginPhone">Mobile Number / ফোন নম্বর *</label>
-                        <input type="tel" id="loginPhone" class="login-input" placeholder="10-digit mobile number" maxlength="10" pattern="[0-9]{10}" required>
-                    </div>
-
-                    <button type="submit" id="btnSendOtp" class="login-submit-btn">
-                        Send OTP / ওটিপি পাঠান ➔
-                    </button>
-                </form>
-            </div>
-
-            <!-- STEP 2: Enter & Verify OTP -->
-            <div id="otpStep2" style="display: none;">
-                <div class="desc">Enter the 6-digit verification code sent to <strong id="otpSentPhone">+91 XXXXXXXXXX</strong>.</div>
-                
-                <div id="otpNoticeBox" style="background: #fff3d8; border: 1px dashed #e2bc69; border-radius: 12px; padding: 10px; margin-bottom: 14px; font-size: 13px; font-weight: 700; color: #7b1010;">
-                    📲 Your verification code is being sent by SMS.
+            <div class="desc">Enter your name and mobile number to start ordering.</div>
+            <form onsubmit="handleCustomerDetails(event)">
+                <div class="form-group">
+                    <label for="loginName">Full Name / আপনার নাম *</label>
+                    <input type="text" id="loginName" class="login-input" placeholder="e.g. Rahul Sen" required>
                 </div>
 
-                <form onsubmit="handleVerifyOTP(event)">
-                    <div class="form-group">
-                        <label for="loginOtp">Enter 6-Digit OTP / ওটিপি কোড *</label>
-                        <input type="text" id="loginOtp" class="login-input" placeholder="e.g. 123456" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" style="text-align:center; font-size:22px; letter-spacing:8px;" required>
-                    </div>
-
-                    <button type="submit" id="btnVerifyOtp" class="login-submit-btn" style="background: linear-gradient(135deg, #16823b, #25994b);">
-                        Verify & Login / ওটিপি নিশ্চিত করুন ➔
-                    </button>
-                </form>
-
-                <div style="margin-top: 14px; font-size: 13px;">
-                    <a href="#" onclick="backToStep1(event)" style="color: #7b1010; font-weight: 700; text-decoration: none;">← Change Name or Phone Number</a>
+                <div class="form-group">
+                    <label for="loginPhone">Mobile Number / ফোন নম্বর *</label>
+                    <input type="tel" id="loginPhone" class="login-input" placeholder="10-digit mobile number" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" required>
                 </div>
-            </div>
+
+                <button type="submit" id="btnCustomerDetails" class="login-submit-btn">
+                    Continue to Menu / মেনু দেখুন ➔
+                </button>
+            </form>
         </div>
     </div>
 
@@ -1795,7 +1768,7 @@
     <script>
 
         /* =====================================================
-           CUSTOMER LOGIN & OTP LOGIC
+           CUSTOMER SESSION LOGIC
         ===================================================== */
 
         async function checkCustomerLogin() {
@@ -1803,13 +1776,13 @@
             const modal = document.getElementById("loginModal");
 
             try {
-                const response = await fetch("/api/auth/session");
+                const response = await fetch("/api/customer-session");
                 if (!response.ok) throw new Error("No active session");
                 const { name, phone } = await response.json();
                 localStorage.setItem("customer_name", name);
                 localStorage.setItem("customer_phone", phone);
                 if (badge) {
-                    badge.innerHTML = `👤 <span>${escapeHtml(name)} (${escapeHtml(phone)})</span> &nbsp;<span style="color:#2ecc71;">✅ Verified</span> &nbsp;✏️`;
+                    badge.innerHTML = `👤 <span>${escapeHtml(name)} (${escapeHtml(phone)})</span> &nbsp;✏️`;
                 }
                 if (modal) {
                     modal.classList.remove("active");
@@ -1828,22 +1801,13 @@
             document.getElementById("loginName").value = name;
             document.getElementById("loginPhone").value = phone;
 
-            document.getElementById("otpStep1").style.display = "block";
-            document.getElementById("otpStep2").style.display = "none";
-
             const modal = document.getElementById("loginModal");
             if (modal) {
                 modal.classList.add("active");
             }
         }
 
-        function backToStep1(e) {
-            if (e) e.preventDefault();
-            document.getElementById("otpStep1").style.display = "block";
-            document.getElementById("otpStep2").style.display = "none";
-        }
-
-        async function handleSendOTP(e) {
+        async function handleCustomerDetails(e) {
             e.preventDefault();
             const name = document.getElementById("loginName").value.trim();
             const phone = document.getElementById("loginPhone").value.trim();
@@ -1858,80 +1822,23 @@
                 return;
             }
 
-            const btn = document.getElementById("btnSendOtp");
+            const btn = document.getElementById("btnCustomerDetails");
             btn.disabled = true;
-            btn.textContent = "Sending OTP...";
+            btn.textContent = "Saving details...";
 
             try {
-                const res = await fetch("/api/auth/send-otp", {
+                const res = await fetch("/api/customer-session", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ phone })
+                    body: JSON.stringify({ name, phone })
                 });
 
                 const data = await res.json();
                 btn.disabled = false;
-                btn.textContent = "Send OTP / ওটিপি পাঠান ➔";
+                btn.textContent = "Continue to Menu / মেনু দেখুন ➔";
 
                 if (!res.ok) {
-                    alert(data.detail || "Could not send OTP");
-                    return;
-                }
-
-                // Save temporary inputs
-                localStorage.setItem("customer_name", name);
-                localStorage.setItem("customer_phone", phone);
-
-                // Switch to Step 2
-                document.getElementById("otpSentPhone").textContent = "+91 " + phone;
-                
-                const noticeBox = document.getElementById("otpNoticeBox");
-                if (data.sms_sent) {
-                    noticeBox.style.background = "#e8f8f0";
-                    noticeBox.style.borderColor = "#2ecc71";
-                    noticeBox.style.color = "#1e8449";
-                    noticeBox.innerHTML = `📲 SMS sent to <strong>+91 ${phone}</strong>! Check your phone messages for the 6-digit code.`;
-                }
-
-                document.getElementById("otpStep1").style.display = "none";
-                document.getElementById("otpStep2").style.display = "block";
-                document.getElementById("loginOtp").value = "";
-                document.getElementById("loginOtp").focus();
-            } catch (err) {
-                btn.disabled = false;
-                btn.textContent = "Send OTP / ওটিপি পাঠান ➔";
-                console.error(err);
-                alert("Error sending OTP. Please try again.");
-            }
-        }
-
-        async function handleVerifyOTP(e) {
-            e.preventDefault();
-            const phone = localStorage.getItem("customer_phone") || "";
-            const otp = document.getElementById("loginOtp").value.trim();
-
-            if (!/^[0-9]{6}$/.test(otp)) {
-                alert("Please enter the valid 6-digit code sent to your phone.");
-                return;
-            }
-
-            const btn = document.getElementById("btnVerifyOtp");
-            btn.disabled = true;
-            btn.textContent = "Verifying...";
-
-            try {
-                const res = await fetch("/api/auth/verify-otp", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: localStorage.getItem("customer_name") || document.getElementById("loginName").value.trim(), phone, otp })
-                });
-
-                const data = await res.json();
-                btn.disabled = false;
-                btn.textContent = "Verify & Login / ওটিপি নিশ্চিত করুন ➔";
-
-                if (!res.ok) {
-                    alert(data.detail || "Invalid OTP code");
+                    alert(data.detail || "Could not save your details");
                     return;
                 }
 
@@ -1940,9 +1847,9 @@
                 await checkCustomerLogin();
             } catch (err) {
                 btn.disabled = false;
-                btn.textContent = "Verify & Login / ওটিপি নিশ্চিত করুন ➔";
+                btn.textContent = "Continue to Menu / মেনু দেখুন ➔";
                 console.error(err);
-                alert("Error verifying OTP. Please try again.");
+                alert("Could not save your details. Please try again.");
             }
         }
 

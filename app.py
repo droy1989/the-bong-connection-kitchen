@@ -1,4 +1,4 @@
-import os, sqlite3, hmac, hashlib, json, base64, secrets, time
+import os, sqlite3, json, base64, secrets, time
 from urllib.parse import quote
 from dotenv import load_dotenv
 
@@ -15,17 +15,10 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "change-me")
 UPI_ID = os.getenv("UPI_ID", "titlibasu37@okaxis")
 UPI_NAME = os.getenv("UPI_NAME", "The Bong Connection")
 
-# Customer OTP authentication. AUTH_SECRET must be a long, private random value
-# supplied to the task definition; it is used only to hash OTPs and sign sessions.
-AUTH_SECRET = os.getenv("AUTH_SECRET", "")
+# A customer browser session stores the supplied name and phone number. It is not
+# identity verification; it simply keeps simultaneous customer orders separate.
 AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
-OTP_TTL_SECONDS = 300
-OTP_RESEND_SECONDS = 60
-OTP_MAX_ATTEMPTS = 5
-SESSION_TTL_SECONDS = 24 * 60 * 60
-
-# AWS SNS SMS configuration. On Fargate boto3 automatically uses the ECS task role.
-AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 
 # Optional PhonePe Business PG credentials
 PHONEPE_MERCHANT_ID = os.getenv("PHONEPE_MERCHANT_ID", "")
@@ -83,12 +76,12 @@ def init_db():
     CREATE TABLE IF NOT EXISTS webhook_events(
       event_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS otp_challenges(
-      phone TEXT PRIMARY KEY,
-      otp_hash TEXT NOT NULL,
+    CREATE TABLE IF NOT EXISTS customer_sessions(
+      session_id TEXT PRIMARY KEY,
+      customer_name TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
       expires_at INTEGER NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_sent_at INTEGER NOT NULL
+      created_at TEXT NOT NULL
     );
     """)
     # Add columns if existing db didn't have them
@@ -102,6 +95,10 @@ def init_db():
         pass
     try:
         c.execute("ALTER TABLE orders ADD COLUMN customer_phone TEXT DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        c.execute("ALTER TABLE orders ADD COLUMN customer_session_id TEXT DEFAULT ''")
     except Exception:
         pass
 
@@ -155,13 +152,9 @@ class OrderIn(BaseModel):
 class ConfirmIn(BaseModel):
     utr_number: str | None = ""
 
-class SendOTPIn(BaseModel):
-    phone: str
-
-class VerifyOTPIn(BaseModel):
-    phone: str
-    otp: str
+class CustomerSessionIn(BaseModel):
     name: str
+    phone: str
 
 def normalized_phone(phone: str) -> str:
     phone = phone.strip()
@@ -169,122 +162,43 @@ def normalized_phone(phone: str) -> str:
         raise HTTPException(400, "Enter a valid 10-digit Indian mobile number")
     return phone
 
-def require_auth_secret():
-    if not AUTH_SECRET:
-        raise HTTPException(503, "OTP login is not configured. Contact the administrator.")
-
-def otp_digest(phone: str, otp: str) -> str:
-    return hmac.new(AUTH_SECRET.encode(), f"{phone}:{otp}".encode(), hashlib.sha256).hexdigest()
-
-def encode_session(name: str, phone: str) -> str:
-    payload = {"name": name, "phone": phone, "exp": int(time.time()) + SESSION_TTL_SECONDS}
-    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
-    signature = hmac.new(AUTH_SECRET.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
-    return f"{payload_b64}.{signature}"
-
-def decode_session(token: str | None) -> dict | None:
-    if not token or not AUTH_SECRET:
-        return None
-    try:
-        payload_b64, signature = token.rsplit(".", 1)
-        expected = hmac.new(AUTH_SECRET.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(signature, expected):
-            return None
-        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4)))
-        if not isinstance(payload.get("name"), str) or not isinstance(payload.get("phone"), str):
-            return None
-        if int(payload.get("exp", 0)) < int(time.time()):
-            return None
-        return payload
-    except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
-        return None
-
 def current_customer(request: Request) -> dict:
-    customer = decode_session(request.cookies.get("customer_session"))
-    if not customer:
-        raise HTTPException(401, "Please verify your mobile number before placing an order")
-    return customer
-
-def send_sms_otp(phone: str, otp: str):
-    """Send an OTP through SNS using the task role, never static AWS keys."""
-    try:
-        import boto3
-        client = boto3.client("sns", region_name=AWS_REGION)
-        client.publish(
-            PhoneNumber=f"+91{phone}",
-            Message=f"Your The Bong Connection login code is {otp}. It expires in 5 minutes.",
-            MessageAttributes={
-                "AWS.SNS.SMS.SMSType": {"DataType": "String", "StringValue": "Transactional"}
-            },
-        )
-        return True
-    except Exception as error:
-        # Do not log the OTP or phone number. CloudWatch logs are broadly accessible operational data.
-        print(f"[AWS SNS Error] {type(error).__name__}")
-        return False
-
-@app.post("/api/auth/send-otp")
-def send_otp(body: SendOTPIn):
-    require_auth_secret()
-    phone = normalized_phone(body.phone)
-    now = int(time.time())
+    session_id = request.cookies.get("customer_session")
+    if not session_id:
+        raise HTTPException(401, "Please enter your name and mobile number before placing an order")
     c = db()
-    existing = c.execute("SELECT last_sent_at FROM otp_challenges WHERE phone=?", (phone,)).fetchone()
-    if existing and now - existing["last_sent_at"] < OTP_RESEND_SECONDS:
+    customer = c.execute("SELECT * FROM customer_sessions WHERE session_id=?", (session_id,)).fetchone()
+    if not customer or customer["expires_at"] < int(time.time()):
+        if customer:
+            c.execute("DELETE FROM customer_sessions WHERE session_id=?", (session_id,)); c.commit()
         c.close()
-        raise HTTPException(429, f"Please wait {OTP_RESEND_SECONDS} seconds before requesting another code")
-
-    otp = f"{secrets.randbelow(1_000_000):06d}"
-    c.execute("""INSERT INTO otp_challenges(phone,otp_hash,expires_at,attempts,last_sent_at)
-                 VALUES(?,?,?,?,?)
-                 ON CONFLICT(phone) DO UPDATE SET otp_hash=excluded.otp_hash, expires_at=excluded.expires_at,
-                 attempts=0, last_sent_at=excluded.last_sent_at""",
-              (phone, otp_digest(phone, otp), now + OTP_TTL_SECONDS, 0, now))
-    c.commit()
-
-    if not send_sms_otp(phone, otp):
-        c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,))
-        c.commit(); c.close()
-        raise HTTPException(503, "Unable to send an SMS right now. Please try again later.")
+        raise HTTPException(401, "Please enter your name and mobile number before placing an order")
     c.close()
-    return {"ok": True, "message": "A verification code was sent to your mobile number."}
+    return dict(customer)
 
-@app.post("/api/auth/verify-otp")
-def verify_otp(body: VerifyOTPIn):
-    require_auth_secret()
-    phone = normalized_phone(body.phone)
-    otp = body.otp.strip()
+@app.post("/api/customer-session")
+def start_customer_session(body: CustomerSessionIn):
     name = body.name.strip()
+    phone = normalized_phone(body.phone)
     if not name or len(name) > 100:
         raise HTTPException(400, "Enter a valid name")
-    if not otp.isdigit() or len(otp) != 6:
-        raise HTTPException(400, "Enter the 6-digit code sent to your mobile number")
-
+    session_id = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + SESSION_TTL_SECONDS
     c = db()
-    challenge = c.execute("SELECT * FROM otp_challenges WHERE phone=?", (phone,)).fetchone()
-    if not challenge or challenge["expires_at"] < int(time.time()):
-        c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,)); c.commit(); c.close()
-        raise HTTPException(400, "This code has expired. Request a new one.")
-    if challenge["attempts"] >= OTP_MAX_ATTEMPTS:
-        c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,)); c.commit(); c.close()
-        raise HTTPException(429, "Too many incorrect attempts. Request a new code.")
-    if not hmac.compare_digest(challenge["otp_hash"], otp_digest(phone, otp)):
-        c.execute("UPDATE otp_challenges SET attempts=attempts+1 WHERE phone=?", (phone,))
-        c.commit(); c.close()
-        raise HTTPException(400, "Invalid verification code")
-
-    c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,)); c.commit(); c.close()
+    c.execute("INSERT INTO customer_sessions(session_id,customer_name,customer_phone,expires_at,created_at) VALUES(?,?,?,?,?)",
+              (session_id, name, phone, expires_at, datetime.now().isoformat(timespec="seconds")))
+    c.commit(); c.close()
     response = JSONResponse(
-        {"ok": True, "message": "Mobile number verified", "name": name, "phone": phone}
+        {"ok": True, "name": name, "phone": phone}
     )
-    response.set_cookie("customer_session", encode_session(name, phone), max_age=SESSION_TTL_SECONDS,
+    response.set_cookie("customer_session", session_id, max_age=SESSION_TTL_SECONDS,
                         httponly=True, secure=AUTH_COOKIE_SECURE, samesite="lax", path="/")
     return response
 
-@app.get("/api/auth/session")
-def auth_session(request: Request):
+@app.get("/api/customer-session")
+def customer_session(request: Request):
     customer = current_customer(request)
-    return {"ok": True, "name": customer["name"], "phone": customer["phone"]}
+    return {"ok": True, "name": customer["customer_name"], "phone": customer["customer_phone"]}
 
 def require_admin(key):
     if key != ADMIN_KEY:
@@ -353,11 +267,12 @@ def create_order(order: OrderIn, request: Request):
 
     token=c.execute("SELECT COALESCE(MAX(token),0)+1 FROM orders").fetchone()[0]
     now=datetime.now().isoformat(timespec="seconds")
-    c_name = customer["name"]
-    c_phone = customer["phone"]
+    c_name = customer["customer_name"]
+    c_phone = customer["customer_phone"]
     cur=c.execute(
-        "INSERT INTO orders(token,total,customer_name,customer_phone,payment_status,order_status,created_at) VALUES(?,?,?,?,?,?,?)",
-        (token,total,c_name,c_phone,"PENDING","WAITING",now)
+        """INSERT INTO orders(token,total,customer_name,customer_phone,customer_session_id,payment_status,order_status,created_at)
+           VALUES(?,?,?,?,?,?,?,?)""",
+        (token,total,c_name,c_phone,customer["session_id"],"PENDING","WAITING",now)
     )
     oid=cur.lastrowid
 

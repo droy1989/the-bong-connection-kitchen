@@ -104,13 +104,9 @@ If you prefer using the AWS Web Console:
     docker push <ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/bong-connection:latest
     ```
 
-### Customer SMS OTP login (AWS SNS)
+### Customer ordering sessions
 
-The application sends customer login codes through Amazon SNS using the ECS task role; do not add static AWS access keys to the container. The CloudFormation stack creates a random signing secret in AWS Secrets Manager and injects it into the task securely.
-
-The stack already grants the task role `sns:Publish`. In the Amazon SNS console for `ap-south-1`, configure SMS for production and ensure your Indian sender/entity/template registration requirements are complete. Accounts still in the SNS SMS sandbox can send only to verified destination numbers.
-
-For production, serve the ALB over HTTPS and deploy with `AUTH_COOKIE_SECURE=true` so the authenticated session cookie is sent only over HTTPS. The current HTTP ALB endpoint needs the default `AUTH_COOKIE_SECURE=false` temporarily or browsers will not retain the session.
+Customers enter a name and mobile number before ordering; no OTP or SMS provider is required. The app creates a separate browser session for each customer and saves that session ID with each order. For production, serve the ALB over HTTPS and deploy with `AUTH_COOKIE_SECURE=true` so the customer-session cookie is sent only over HTTPS. The current HTTP ALB endpoint needs the default `AUTH_COOKIE_SECURE=false` temporarily or browsers will not retain the session.
 
 ### Step 2: Create EFS File System (Persistent Storage)
 1. Open AWS Console -> **Amazon EFS** -> **Create file system**.
