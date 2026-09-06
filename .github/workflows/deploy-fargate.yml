@@ -1,0 +1,113 @@
+name: Deploy to AWS ECS Fargate
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'ap-south-1' }}
+  ECR_REPOSITORY: bong-connection
+  STACK_NAME: prod-bong-connection-stack
+  ENV_NAME: prod
+
+jobs:
+  deploy:
+    name: Build, Push & Deploy to Fargate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} &>/dev/null || \
+          aws ecr create-repository \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --region ${{ env.AWS_REGION }} \
+            --image-scanning-configuration scanOnPush=true \
+            --encryption-configuration encryptionType=AES256
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building Docker container for AWS Fargate..."
+          docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+          echo "IMAGE_URI=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Deploy CloudFormation Stack to AWS Fargate
+        run: |
+          ADMIN_KEY_VAL="${{ secrets.ADMIN_KEY }}"
+          if [ -z "$ADMIN_KEY_VAL" ]; then
+            ADMIN_KEY_VAL="bong-connection-admin-2026"
+          fi
+          
+          UPI_ID_VAL="${{ secrets.UPI_ID }}"
+          if [ -z "$UPI_ID_VAL" ]; then
+            UPI_ID_VAL="titlibasu37@okaxis"
+          fi
+
+          UPI_NAME_VAL="${{ secrets.UPI_NAME }}"
+          if [ -z "$UPI_NAME_VAL" ]; then
+            UPI_NAME_VAL="The Bong Connection"
+          fi
+
+          echo "Deploying CloudFormation stack: ${{ env.STACK_NAME }} in ${{ env.AWS_REGION }}..."
+          aws cloudformation deploy \
+            --template-file aws/fargate-template.yaml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+                EnvironmentName="${{ env.ENV_NAME }}" \
+                ContainerImage="${{ env.IMAGE_URI }}" \
+                AdminKey="$ADMIN_KEY_VAL" \
+                UpiId="$UPI_ID_VAL" \
+                UpiName="$UPI_NAME_VAL" \
+            --no-fail-on-empty-changeset
+
+      - name: Fetch and Display Live Application URLs
+        run: |
+          WEBSITE_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteURL'].OutputValue" \
+            --output text)
+
+          echo "========================================================="
+          echo "Website URL:   $WEBSITE_URL"
+          echo "Admin URL:     $WEBSITE_URL/admin"
+          echo "Queue Display: $WEBSITE_URL/display"
+          echo "Health Check:  $WEBSITE_URL/health"
+          echo "========================================================="
+
+          echo "### 🚀 AWS Fargate Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Public URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🍽️ **Customer Menu** | [$WEBSITE_URL]($WEBSITE_URL) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👨‍🍳 **Kitchen Dashboard** | [$WEBSITE_URL/admin]($WEBSITE_URL/admin) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📺 **Queue Board** | [$WEBSITE_URL/display]($WEBSITE_URL/display) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🩺 **Health Check** | [$WEBSITE_URL/health]($WEBSITE_URL/health) |" >> $GITHUB_STEP_SUMMARY
