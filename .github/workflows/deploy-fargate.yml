@@ -74,6 +74,11 @@ jobs:
             UPI_NAME_VAL="The Bong Connection"
           fi
 
+          AUTH_COOKIE_SECURE_VAL="${{ secrets.AUTH_COOKIE_SECURE }}"
+          if [ -z "$AUTH_COOKIE_SECURE_VAL" ]; then
+            AUTH_COOKIE_SECURE_VAL="false"
+          fi
+
           echo "Deploying CloudFormation stack: ${{ env.STACK_NAME }} in ${{ env.AWS_REGION }}..."
           aws cloudformation deploy \
             --template-file aws/fargate-template.yaml \
@@ -84,6 +89,7 @@ jobs:
                 EnvironmentName="${{ env.ENV_NAME }}" \
                 ContainerImage="${{ env.IMAGE_URI }}" \
                 AdminKey="$ADMIN_KEY_VAL" \
+                AuthCookieSecure="$AUTH_COOKIE_SECURE_VAL" \
                 UpiId="$UPI_ID_VAL" \
                 UpiName="$UPI_NAME_VAL" \
             --no-fail-on-empty-changeset

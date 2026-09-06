@@ -23,6 +23,7 @@ fi
 ADMIN_KEY="${ADMIN_KEY:-change-me-in-production}"
 UPI_ID="${UPI_ID:-titlibasu37@okaxis}"
 UPI_NAME="${UPI_NAME:-The Bong Connection}"
+AUTH_COOKIE_SECURE="${AUTH_COOKIE_SECURE:-false}"
 
 echo "========================================================="
 echo "   Deploying The Bong Connection to AWS ECS Fargate      "
@@ -92,6 +93,7 @@ aws cloudformation deploy \
       EnvironmentName="$ENV_NAME" \
       ContainerImage="${ECR_URI}:${IMAGE_TAG}" \
       AdminKey="$ADMIN_KEY" \
+      AuthCookieSecure="$AUTH_COOKIE_SECURE" \
       UpiId="$UPI_ID" \
       UpiName="$UPI_NAME" \
   --no-fail-on-empty-changeset

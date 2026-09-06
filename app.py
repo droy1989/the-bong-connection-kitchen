@@ -1,4 +1,4 @@
-import os, sqlite3, hmac, hashlib, json, base64, random, urllib.request, urllib.parse
+import os, sqlite3, hmac, hashlib, json, base64, secrets, time
 from urllib.parse import quote
 from dotenv import load_dotenv
 
@@ -6,7 +6,7 @@ load_dotenv()
 
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Header, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -15,15 +15,17 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "change-me")
 UPI_ID = os.getenv("UPI_ID", "titlibasu37@okaxis")
 UPI_NAME = os.getenv("UPI_NAME", "The Bong Connection")
 
-# SMS Gateway Configuration (AWS SNS / Fast2SMS / Twilio)
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+# Customer OTP authentication. AUTH_SECRET must be a long, private random value
+# supplied to the task definition; it is used only to hash OTPs and sign sessions.
+AUTH_SECRET = os.getenv("AUTH_SECRET", "")
+AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
+OTP_TTL_SECONDS = 300
+OTP_RESEND_SECONDS = 60
+OTP_MAX_ATTEMPTS = 5
+SESSION_TTL_SECONDS = 24 * 60 * 60
 
-FAST2SMS_API_KEY = os.getenv("FAST2SMS_API_KEY", "")
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
+# AWS SNS SMS configuration. On Fargate boto3 automatically uses the ECS task role.
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 
 # Optional PhonePe Business PG credentials
 PHONEPE_MERCHANT_ID = os.getenv("PHONEPE_MERCHANT_ID", "")
@@ -80,6 +82,13 @@ def init_db():
     );
     CREATE TABLE IF NOT EXISTS webhook_events(
       event_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS otp_challenges(
+      phone TEXT PRIMARY KEY,
+      otp_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_sent_at INTEGER NOT NULL
     );
     """)
     # Add columns if existing db didn't have them
@@ -146,115 +155,136 @@ class OrderIn(BaseModel):
 class ConfirmIn(BaseModel):
     utr_number: str | None = ""
 
-OTP_STORE = {}
-
 class SendOTPIn(BaseModel):
     phone: str
 
 class VerifyOTPIn(BaseModel):
     phone: str
     otp: str
+    name: str
+
+def normalized_phone(phone: str) -> str:
+    phone = phone.strip()
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(400, "Enter a valid 10-digit Indian mobile number")
+    return phone
+
+def require_auth_secret():
+    if not AUTH_SECRET:
+        raise HTTPException(503, "OTP login is not configured. Contact the administrator.")
+
+def otp_digest(phone: str, otp: str) -> str:
+    return hmac.new(AUTH_SECRET.encode(), f"{phone}:{otp}".encode(), hashlib.sha256).hexdigest()
+
+def encode_session(name: str, phone: str) -> str:
+    payload = {"name": name, "phone": phone, "exp": int(time.time()) + SESSION_TTL_SECONDS}
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(AUTH_SECRET.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{signature}"
+
+def decode_session(token: str | None) -> dict | None:
+    if not token or not AUTH_SECRET:
+        return None
+    try:
+        payload_b64, signature = token.rsplit(".", 1)
+        expected = hmac.new(AUTH_SECRET.encode(), payload_b64.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            return None
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4)))
+        if not isinstance(payload.get("name"), str) or not isinstance(payload.get("phone"), str):
+            return None
+        if int(payload.get("exp", 0)) < int(time.time()):
+            return None
+        return payload
+    except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+def current_customer(request: Request) -> dict:
+    customer = decode_session(request.cookies.get("customer_session"))
+    if not customer:
+        raise HTTPException(401, "Please verify your mobile number before placing an order")
+    return customer
 
 def send_sms_otp(phone: str, otp: str):
-    """Sends SMS via AWS SNS, Fast2SMS (India), or Twilio if API keys are configured."""
-    print(f"\n[SMS OTP GATEWAY] Sending OTP {otp} to mobile number: +91{phone}")
-
-    # AWS SNS SMS Integration (Transactional SMS)
-    if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
-        try:
-            import boto3
-            client = boto3.client(
-                'sns',
-                aws_access_key_id=AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                region_name=AWS_REGION
-            )
-            phone_formatted = f"+91{phone}" if not phone.startswith("+") else phone
-            res = client.publish(
-                PhoneNumber=phone_formatted,
-                Message=f"Your OTP for The Bong Connection food stall order is {otp}. Valid for 5 minutes.",
-                MessageAttributes={
-                    'AWS.SNS.SMS.SMSType': {
-                        'DataType': 'String',
-                        'StringValue': 'Transactional'
-                    }
-                }
-            )
-            print(f"[AWS SNS Response]: MessageId={res.get('MessageId')}")
-            return True
-        except Exception as e:
-            print(f"[AWS SNS Error]: {e}")
-
-    # Fast2SMS Integration (popular for India)
-    if FAST2SMS_API_KEY:
-        try:
-            url = f"https://www.fast2sms.com/dev/bulkV2?authorization={FAST2SMS_API_KEY}&variables_values={otp}&route=otp&numbers={phone}"
-            req = urllib.request.Request(url, headers={"User-Agent": "FastAPI-App"})
-            with urllib.request.urlopen(req) as resp:
-                res_data = json.loads(resp.read().decode())
-                print(f"[Fast2SMS Response]: {res_data}")
-                return True
-        except Exception as e:
-            print(f"[Fast2SMS Error]: {e}")
-
-    # Twilio Integration (Global)
-    if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER:
-        try:
-            twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}/Messages.json"
-            data = urllib.parse.urlencode({
-                "From": TWILIO_FROM_NUMBER,
-                "To": f"+91{phone}" if not phone.startswith("+") else phone,
-                "Body": f"Your OTP for The Bong Connection food stall order is {otp}. Valid for 5 minutes."
-            }).encode('utf-8')
-
-            auth_str = base64.b64encode(f"{TWILIO_ACCOUNT_SID}:{TWILIO_AUTH_TOKEN}".encode()).decode()
-            req = urllib.request.Request(twilio_url, data=data, headers={
-                "Authorization": f"Basic {auth_str}",
-                "Content-Type": "application/x-www-form-urlencoded"
-            })
-            with urllib.request.urlopen(req) as resp:
-                res_data = json.loads(resp.read().decode())
-                print(f"[Twilio Response]: {res_data}")
-                return True
-        except Exception as e:
-            print(f"[Twilio Error]: {e}")
-
-    return False
+    """Send an OTP through SNS using the task role, never static AWS keys."""
+    try:
+        import boto3
+        client = boto3.client("sns", region_name=AWS_REGION)
+        client.publish(
+            PhoneNumber=f"+91{phone}",
+            Message=f"Your The Bong Connection login code is {otp}. It expires in 5 minutes.",
+            MessageAttributes={
+                "AWS.SNS.SMS.SMSType": {"DataType": "String", "StringValue": "Transactional"}
+            },
+        )
+        return True
+    except Exception as error:
+        # Do not log the OTP or phone number. CloudWatch logs are broadly accessible operational data.
+        print(f"[AWS SNS Error] {type(error).__name__}")
+        return False
 
 @app.post("/api/auth/send-otp")
 def send_otp(body: SendOTPIn):
-    phone = body.phone.strip()
-    if len(phone) != 10 or not phone.isdigit():
-        raise HTTPException(400, "Invalid 10-digit phone number")
-    
-    # Generate random 4-digit OTP
-    otp = f"{random.randint(1000, 9999)}"
-    OTP_STORE[phone] = otp
-    
-    sms_sent = send_sms_otp(phone, otp)
+    require_auth_secret()
+    phone = normalized_phone(body.phone)
+    now = int(time.time())
+    c = db()
+    existing = c.execute("SELECT last_sent_at FROM otp_challenges WHERE phone=?", (phone,)).fetchone()
+    if existing and now - existing["last_sent_at"] < OTP_RESEND_SECONDS:
+        c.close()
+        raise HTTPException(429, f"Please wait {OTP_RESEND_SECONDS} seconds before requesting another code")
 
-    res = {
-        "ok": True,
-        "message": "OTP sent to your mobile number via SMS" if sms_sent else "OTP generated. (Configure FAST2SMS_API_KEY in .env for live SMS delivery)",
-        "sms_sent": sms_sent
-    }
-    
-    # Include demo_otp only if SMS gateway is not configured yet
-    if not sms_sent:
-        res["demo_otp"] = otp
+    otp = f"{secrets.randbelow(1_000_000):06d}"
+    c.execute("""INSERT INTO otp_challenges(phone,otp_hash,expires_at,attempts,last_sent_at)
+                 VALUES(?,?,?,?,?)
+                 ON CONFLICT(phone) DO UPDATE SET otp_hash=excluded.otp_hash, expires_at=excluded.expires_at,
+                 attempts=0, last_sent_at=excluded.last_sent_at""",
+              (phone, otp_digest(phone, otp), now + OTP_TTL_SECONDS, 0, now))
+    c.commit()
 
-    return res
+    if not send_sms_otp(phone, otp):
+        c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,))
+        c.commit(); c.close()
+        raise HTTPException(503, "Unable to send an SMS right now. Please try again later.")
+    c.close()
+    return {"ok": True, "message": "A verification code was sent to your mobile number."}
 
 @app.post("/api/auth/verify-otp")
 def verify_otp(body: VerifyOTPIn):
-    phone = body.phone.strip()
+    require_auth_secret()
+    phone = normalized_phone(body.phone)
     otp = body.otp.strip()
-    
-    expected = OTP_STORE.get(phone)
-    if expected and (otp == expected or otp == "1234"):
-        return {"ok": True, "message": "OTP verified successfully"}
-    
-    raise HTTPException(400, "Invalid OTP code. Please check your mobile phone for the 4-digit code.")
+    name = body.name.strip()
+    if not name or len(name) > 100:
+        raise HTTPException(400, "Enter a valid name")
+    if not otp.isdigit() or len(otp) != 6:
+        raise HTTPException(400, "Enter the 6-digit code sent to your mobile number")
+
+    c = db()
+    challenge = c.execute("SELECT * FROM otp_challenges WHERE phone=?", (phone,)).fetchone()
+    if not challenge or challenge["expires_at"] < int(time.time()):
+        c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,)); c.commit(); c.close()
+        raise HTTPException(400, "This code has expired. Request a new one.")
+    if challenge["attempts"] >= OTP_MAX_ATTEMPTS:
+        c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,)); c.commit(); c.close()
+        raise HTTPException(429, "Too many incorrect attempts. Request a new code.")
+    if not hmac.compare_digest(challenge["otp_hash"], otp_digest(phone, otp)):
+        c.execute("UPDATE otp_challenges SET attempts=attempts+1 WHERE phone=?", (phone,))
+        c.commit(); c.close()
+        raise HTTPException(400, "Invalid verification code")
+
+    c.execute("DELETE FROM otp_challenges WHERE phone=?", (phone,)); c.commit(); c.close()
+    response = JSONResponse(
+        {"ok": True, "message": "Mobile number verified", "name": name, "phone": phone}
+    )
+    response.set_cookie("customer_session", encode_session(name, phone), max_age=SESSION_TTL_SECONDS,
+                        httponly=True, secure=AUTH_COOKIE_SECURE, samesite="lax", path="/")
+    return response
+
+@app.get("/api/auth/session")
+def auth_session(request: Request):
+    customer = current_customer(request)
+    return {"ok": True, "name": customer["name"], "phone": customer["phone"]}
 
 def require_admin(key):
     if key != ADMIN_KEY:
@@ -296,7 +326,8 @@ def products(menu_date: str | None = None):
     return [dict(r) for r in rows]
 
 @app.post("/api/orders")
-def create_order(order: OrderIn):
+def create_order(order: OrderIn, request: Request):
+    customer = current_customer(request)
     if not order.items:
         raise HTTPException(400, "Cart is empty")
 
@@ -322,8 +353,8 @@ def create_order(order: OrderIn):
 
     token=c.execute("SELECT COALESCE(MAX(token),0)+1 FROM orders").fetchone()[0]
     now=datetime.now().isoformat(timespec="seconds")
-    c_name = (order.customer_name or "").strip()
-    c_phone = (order.customer_phone or "").strip()
+    c_name = customer["name"]
+    c_phone = customer["phone"]
     cur=c.execute(
         "INSERT INTO orders(token,total,customer_name,customer_phone,payment_status,order_status,created_at) VALUES(?,?,?,?,?,?,?)",
         (token,total,c_name,c_phone,"PENDING","WAITING",now)

@@ -14,6 +14,11 @@ Parameters:
     NoEcho: true
     Default: 'change-me-in-production'
     Description: 'Password/Key for accessing /admin kitchen dashboard'
+  AuthCookieSecure:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: 'Set true once the public load balancer is served over HTTPS'
   UpiId:
     Type: String
     Default: 'titlibasu37@okaxis'
@@ -241,6 +246,15 @@ Resources:
       LogGroupName: !Sub '/ecs/${EnvironmentName}-bong-connection'
       RetentionInDays: 14
 
+  CustomerAuthSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${EnvironmentName}-bong-connection-auth-secret'
+      Description: 'Signing secret for customer OTP verification and sessions'
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
   ECSTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -253,6 +267,14 @@ Resources:
             Action: ['sts:AssumeRole']
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadCustomerAuthSecret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ['secretsmanager:GetSecretValue']
+                Resource: !Ref CustomerAuthSecret
 
   ECSTaskRole:
     Type: AWS::IAM::Role
@@ -321,6 +343,11 @@ Resources:
               Value: !Ref UpiName
             - Name: AWS_REGION
               Value: !Ref 'AWS::Region'
+            - Name: AUTH_COOKIE_SECURE
+              Value: !Ref AuthCookieSecure
+          Secrets:
+            - Name: AUTH_SECRET
+              ValueFrom: !Ref CustomerAuthSecret
           LogConfiguration:
             LogDriver: awslogs
             Options:
