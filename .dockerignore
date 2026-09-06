@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Git & IDE
+.git/
+.gitignore
+.DS_Store
+.idea/
+.vscode/
+
+# Local secrets & environment files
+.env
+*.env
+
+# SQLite local database (use volume/EFS in production)
+*.db
+foodstall.db
+
+# Archives & temporary bundles
+*.zip
+*.tar.gz

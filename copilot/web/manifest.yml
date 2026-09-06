@@ -1,0 +1,49 @@
+# AWS Copilot Manifest for The Bong Connection Web Service on ECS Fargate
+name: web
+type: Load Balanced Web Service
+
+# Routing and Ingress via Application Load Balancer (ALB)
+http:
+  path: '/'
+  healthcheck:
+    path: '/health'
+    port: 8000
+    success_codes: '200'
+    healthy_threshold: 2
+    unhealthy_threshold: 3
+    interval: 30s
+    timeout: 5s
+    grace_period: 60s
+
+# Container Image and Port Configuration
+image:
+  build: Dockerfile
+  port: 8000
+
+# Compute resources (Fargate)
+cpu: 256       # 0.25 vCPU (cost-effective)
+memory: 512    # 512 MB
+count: 1       # Desired task count: 1 (recommended for single SQLite database)
+exec: true     # Allows remote debugging shell via 'copilot svc exec'
+
+# Persistent Storage via Amazon EFS for SQLite
+storage:
+  volumes:
+    dbVolume:
+      path: '/data'
+      read_only: false
+      efs:
+        root_dir: '/data'
+
+# Environment Variables
+variables:
+  PORT: "8000"
+  DB_PATH: "/data/foodstall.db"
+  UPI_ID: "titlibasu37@okaxis"
+  UPI_NAME: "The Bong Connection"
+  AWS_REGION: "ap-south-1"
+
+# Sensitive variables stored in AWS SSM Parameter Store / Secrets Manager:
+# Set via: copilot secret init --name ADMIN_KEY
+secrets:
+  ADMIN_KEY: /copilot/${COPILOT_APPLICATION_NAME}/${COPILOT_ENVIRONMENT_NAME}/secrets/ADMIN_KEY

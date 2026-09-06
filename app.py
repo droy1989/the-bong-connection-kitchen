@@ -34,7 +34,14 @@ PHONEPE_ENV = os.getenv("PHONEPE_ENV", "UAT")
 app = FastAPI(title="Food Stall Queue Ordering")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "bong-connection"}
+
 def db():
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
     return c
