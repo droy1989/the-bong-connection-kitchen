@@ -247,7 +247,6 @@ Resources:
     Properties:
       DBInstanceIdentifier: !Sub '${EnvironmentName}-bong-connection-db'
       Engine: postgres
-      EngineVersion: '16.4'
       DBInstanceClass: !Ref DBInstanceClass
       AllocatedStorage: !Ref DBAllocatedStorage
       StorageType: gp3
