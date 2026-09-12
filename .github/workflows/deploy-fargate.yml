@@ -85,6 +85,17 @@ jobs:
             AUTH_COOKIE_SECURE_VAL="true"
           fi
 
+          DB_PASSWORD_VAL="${{ secrets.DB_PASSWORD }}"
+          if [ -z "$DB_PASSWORD_VAL" ]; then
+            echo "Missing required GitHub secret: DB_PASSWORD"
+            exit 1
+          fi
+
+          DB_USERNAME_VAL="${{ secrets.DB_USERNAME }}"
+          if [ -z "$DB_USERNAME_VAL" ]; then
+            DB_USERNAME_VAL="bongadmin"
+          fi
+
           echo "Deploying CloudFormation stack: ${{ env.STACK_NAME }} in ${{ env.AWS_REGION }}..."
           aws cloudformation deploy \
             --template-file aws/fargate-template.yaml \
@@ -99,6 +110,8 @@ jobs:
                 AuthCookieSecure="$AUTH_COOKIE_SECURE_VAL" \
                 UpiId="$UPI_ID_VAL" \
                 UpiName="$UPI_NAME_VAL" \
+                DBUsername="$DB_USERNAME_VAL" \
+                DBPassword="$DB_PASSWORD_VAL" \
             --no-fail-on-empty-changeset
 
       - name: Fetch and Display Live Application URLs

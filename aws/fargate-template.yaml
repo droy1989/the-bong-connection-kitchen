@@ -30,6 +30,23 @@ Parameters:
     Type: String
     Default: 'The Bong Connection'
     Description: 'Business/Stall name shown on UPI apps'
+  DBUsername:
+    Type: String
+    Default: 'bongadmin'
+    Description: 'Master username for the RDS Postgres database'
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: 'Master password for the RDS Postgres database'
+  DBInstanceClass:
+    Type: String
+    Default: 'db.t4g.micro'
+    Description: 'RDS instance size (db.t4g.micro is Free-Tier eligible in most regions)'
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    Description: 'RDS storage size in GB'
 
 Resources:
   # ------------------------------------------------------------
@@ -157,6 +174,20 @@ Resources:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
 
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Allow Postgres traffic only from Fargate tasks'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref FargateSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
   # ------------------------------------------------------------
   # 3. AMAZON EFS (Persistent SQLite Storage)
   # ------------------------------------------------------------
@@ -197,6 +228,39 @@ Resources:
           OwnerGid: '1000'
           Permissions: '755'
         Path: '/data'
+
+  # ------------------------------------------------------------
+  # 3b. AMAZON RDS (Postgres - persistent order/menu storage)
+  # ------------------------------------------------------------
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: 'Subnets available for the RDS instance'
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub '${EnvironmentName}-bong-connection-db'
+      Engine: postgres
+      EngineVersion: '16.4'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      StorageType: gp3
+      DBName: bongconnection
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 7
+      StorageEncrypted: true
 
   # ------------------------------------------------------------
   # 4. LOAD BALANCER & TARGET GROUP
@@ -333,8 +397,8 @@ Resources:
           Environment:
             - Name: PORT
               Value: '8000'
-            - Name: DB_PATH
-              Value: '/data/foodstall.db'
+            - Name: DATABASE_URL
+              Value: !Sub 'postgresql://${DBUsername}:${DBPassword}@${DBInstance.Endpoint.Address}:${DBInstance.Endpoint.Port}/bongconnection'
             - Name: ADMIN_KEY
               Value: !Ref AdminKey
             - Name: UPI_ID

@@ -1,4 +1,4 @@
-import os, sqlite3, json, base64, secrets, time
+import os, json, base64, secrets, time
 from urllib.parse import quote
 from dotenv import load_dotenv
 
@@ -10,7 +10,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-DB_PATH = os.getenv("DB_PATH", "foodstall.db")
+from db import get_db, IS_POSTGRES
+
 ADMIN_KEY = os.getenv("ADMIN_KEY", "change-me")
 UPI_ID = os.getenv("UPI_ID", "titlibasu37@okaxis")
 UPI_NAME = os.getenv("UPI_NAME", "The Bong Connection")
@@ -34,18 +35,16 @@ def health_check():
     return {"status": "healthy", "service": "bong-connection"}
 
 def db():
-    db_dir = os.path.dirname(DB_PATH)
-    if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
-    c = sqlite3.connect(DB_PATH)
-    c.row_factory = sqlite3.Row
-    return c
+    return get_db()
+
+# id column syntax differs: SQLite uses AUTOINCREMENT, Postgres uses SERIAL.
+_PK = "SERIAL PRIMARY KEY" if IS_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
 def init_db():
     c=db()
-    c.executescript("""
+    c.executescript(f"""
     CREATE TABLE IF NOT EXISTS products(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id {_PK},
       name TEXT NOT NULL, description TEXT DEFAULT '',
       price INTEGER NOT NULL, demand INTEGER DEFAULT 0,
       sourcing TEXT DEFAULT 'OUT', available INTEGER DEFAULT 1
@@ -56,7 +55,7 @@ def init_db():
       PRIMARY KEY(product_id, menu_date)
     );
     CREATE TABLE IF NOT EXISTS orders(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id {_PK},
       token INTEGER UNIQUE NOT NULL,
       total INTEGER NOT NULL,
       customer_name TEXT DEFAULT '',
@@ -69,7 +68,7 @@ def init_db():
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS order_items(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id {_PK},
       order_id INTEGER NOT NULL, product_id INTEGER NOT NULL,
       name TEXT NOT NULL, price INTEGER NOT NULL, quantity INTEGER NOT NULL
     );
@@ -84,25 +83,32 @@ def init_db():
       created_at TEXT NOT NULL
     );
     """)
-    # Add columns if existing db didn't have them
-    try:
-        c.execute("ALTER TABLE orders ADD COLUMN utr_number TEXT DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        c.execute("ALTER TABLE orders ADD COLUMN customer_name TEXT DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        c.execute("ALTER TABLE orders ADD COLUMN customer_phone TEXT DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        c.execute("ALTER TABLE orders ADD COLUMN customer_session_id TEXT DEFAULT ''")
-    except Exception:
-        pass
+    c.commit()
 
-    if c.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
+    # Add columns if an existing (older) db didn't have them yet.
+    if IS_POSTGRES:
+        for stmt in [
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS utr_number TEXT DEFAULT ''",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT ''",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT DEFAULT ''",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_session_id TEXT DEFAULT ''",
+        ]:
+            c.execute(stmt)
+        c.commit()
+    else:
+        for stmt in [
+            "ALTER TABLE orders ADD COLUMN utr_number TEXT DEFAULT ''",
+            "ALTER TABLE orders ADD COLUMN customer_name TEXT DEFAULT ''",
+            "ALTER TABLE orders ADD COLUMN customer_phone TEXT DEFAULT ''",
+            "ALTER TABLE orders ADD COLUMN customer_session_id TEXT DEFAULT ''",
+        ]:
+            try:
+                c.execute(stmt)
+            except Exception:
+                pass
+        c.commit()
+
+    if c.execute("SELECT COUNT(*) AS cnt FROM products").fetchone()["cnt"] == 0:
         products = [
             ("Egg Roll","Bengali-style egg roll",80,30,"IN"),
             ("Egg-Chicken Roll","Egg and chicken roll",120,40,"IN"),
@@ -265,16 +271,19 @@ def create_order(order: OrderIn, request: Request):
         total += r["price"] * x.quantity
         clean.append((r["id"], r["name"], r["price"], x.quantity))
 
-    token=c.execute("SELECT COALESCE(MAX(token),0)+1 FROM orders").fetchone()[0]
+    token=c.execute("SELECT COALESCE(MAX(token),0)+1 AS next_token FROM orders").fetchone()["next_token"]
     now=datetime.now().isoformat(timespec="seconds")
     c_name = customer["customer_name"]
     c_phone = customer["customer_phone"]
-    cur=c.execute(
-        """INSERT INTO orders(token,total,customer_name,customer_phone,customer_session_id,payment_status,order_status,created_at)
-           VALUES(?,?,?,?,?,?,?,?)""",
-        (token,total,c_name,c_phone,customer["session_id"],"PENDING","WAITING",now)
-    )
-    oid=cur.lastrowid
+    insert_sql = """INSERT INTO orders(token,total,customer_name,customer_phone,customer_session_id,payment_status,order_status,created_at)
+           VALUES(?,?,?,?,?,?,?,?)"""
+    insert_params = (token,total,c_name,c_phone,customer["session_id"],"PENDING","WAITING",now)
+    if c.is_postgres:
+        cur = c.execute(insert_sql + " RETURNING id", insert_params)
+        oid = cur.fetchone()["id"]
+    else:
+        cur = c.execute(insert_sql, insert_params)
+        oid = cur.lastrowid
 
     c.executemany(
         "INSERT INTO order_items(order_id,product_id,name,price,quantity) VALUES(?,?,?,?,?)",
@@ -406,9 +415,10 @@ def menu_dates():
 @app.get("/api/menu-plan")
 def menu_plan():
     c=db()
+    agg = "STRING_AGG(m.menu_date, ',')" if c.is_postgres else "GROUP_CONCAT(m.menu_date)"
     rows=c.execute(
-        """SELECT p.name,p.price,p.demand,p.sourcing,
-                  GROUP_CONCAT(m.menu_date) AS dates
+        f"""SELECT p.id,p.name,p.price,p.demand,p.sourcing,
+                  {agg} AS dates
            FROM products p JOIN menu_dates m ON m.product_id=p.id
            GROUP BY p.id ORDER BY p.id"""
     ).fetchall()
