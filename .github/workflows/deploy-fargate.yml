@@ -63,6 +63,12 @@ jobs:
           if [ -z "$ADMIN_KEY_VAL" ]; then
             ADMIN_KEY_VAL="bong-connection-admin-2026"
           fi
+
+          CERTIFICATE_ARN_VAL="${{ secrets.ACM_CERTIFICATE_ARN }}"
+          if [ -z "$CERTIFICATE_ARN_VAL" ]; then
+            echo "Missing required GitHub secret: ACM_CERTIFICATE_ARN"
+            exit 1
+          fi
           
           UPI_ID_VAL="${{ secrets.UPI_ID }}"
           if [ -z "$UPI_ID_VAL" ]; then
@@ -76,7 +82,7 @@ jobs:
 
           AUTH_COOKIE_SECURE_VAL="${{ secrets.AUTH_COOKIE_SECURE }}"
           if [ -z "$AUTH_COOKIE_SECURE_VAL" ]; then
-            AUTH_COOKIE_SECURE_VAL="false"
+            AUTH_COOKIE_SECURE_VAL="true"
           fi
 
           echo "Deploying CloudFormation stack: ${{ env.STACK_NAME }} in ${{ env.AWS_REGION }}..."
@@ -89,6 +95,7 @@ jobs:
                 EnvironmentName="${{ env.ENV_NAME }}" \
                 ContainerImage="${{ env.IMAGE_URI }}" \
                 AdminKey="$ADMIN_KEY_VAL" \
+                CertificateArn="$CERTIFICATE_ARN_VAL" \
                 AuthCookieSecure="$AUTH_COOKIE_SECURE_VAL" \
                 UpiId="$UPI_ID_VAL" \
                 UpiName="$UPI_NAME_VAL" \
