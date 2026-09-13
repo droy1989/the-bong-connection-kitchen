@@ -192,12 +192,12 @@ def init_db():
         "Chicken Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Singara": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg Devil": ["2026-10-17", "2026-10-19"],
-        "Chicken Cutlet": ["2026-10-17", "2026-10-19", "2026-10-20"],
+        "Chicken Cutlet": ["2026-10-17", "2026-10-20"],
         "Gandhoraj Fish Fry": ["2026-10-16", "2026-10-19", "2026-10-20"],
         "Bhetki Fish Fry": ["2026-10-18"],
-        "Luchi + Mutton Curry": ["2026-10-18", "2026-10-19", "2026-10-20"],
-        "Mutton Curry (3 Pcs Mutton)": ["2026-10-18", "2026-10-19", "2026-10-20"],
-        "Basanti Polao + Mutton Curry": ["2026-10-18", "2026-10-19", "2026-10-20"],
+        "Luchi + Mutton Curry": ["2026-10-18", "2026-10-20"],
+        "Mutton Curry (3 Pcs Mutton)": ["2026-10-18", "2026-10-20"],
+        "Basanti Polao + Mutton Curry": ["2026-10-18", "2026-10-20"],
         "Veg Chop": ["2026-10-19"],
         "Egg Fried Rice": ["2026-10-19"],
         "Egg Chicken Fried Rice": ["2026-10-19"],
@@ -221,7 +221,13 @@ def init_db():
             )
             pid = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()["id"]
 
-        for d in dates.get(name, []):
+        target_dates = set(dates.get(name, []))
+        current_dates = [r["menu_date"] for r in c.execute("SELECT menu_date FROM menu_dates WHERE product_id=?", (pid,)).fetchall()]
+        for cd in current_dates:
+            if cd not in target_dates:
+                c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (pid, cd))
+
+        for d in target_dates:
             exists = c.execute(
                 "SELECT 1 FROM menu_dates WHERE product_id=? AND menu_date=?",
                 (pid, d)
