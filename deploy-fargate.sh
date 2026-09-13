@@ -21,7 +21,7 @@ if [ -f .env ]; then
 fi
 
 ADMIN_KEY="${ADMIN_KEY:-change-me-in-production}"
-UPI_ID="${UPI_ID:-titlibasu37@okaxis}"
+UPI_ID="${UPI_ID:-7829039536@hdfc}"
 UPI_NAME="${UPI_NAME:-The Bong Connection}"
 AUTH_COOKIE_SECURE="${AUTH_COOKIE_SECURE:-false}"
 

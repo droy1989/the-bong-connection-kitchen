@@ -21,7 +21,7 @@ This is the fastest and easiest method because GitHub runs Docker in the cloud f
    - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key.
    - *(Optional)* `AWS_REGION`: Defaults to `ap-south-1` if omitted.
    - *(Optional)* `ADMIN_KEY`: Password to access `/admin` kitchen screen (defaults to a secure fallback).
-   - *(Optional)* `UPI_ID`: Your stall UPI ID (e.g. `titlibasu37@okaxis`).
+   - *(Optional)* `UPI_ID`: Your stall UPI ID (e.g. `7829039536@hdfc`).
 
 ### Step 2: Push Your Code
 Commit and push the newly added workflow to GitHub:
@@ -137,7 +137,7 @@ Customers enter a name and mobile number before ordering; no OTP or SMS provider
      - `PORT`: `8000`
      - `DB_PATH`: `/data/foodstall.db`
      - `ADMIN_KEY`: `<YOUR_ADMIN_PASSWORD>`
-     - `UPI_ID`: `titlibasu37@okaxis`
+     - `UPI_ID`: `7829039536@hdfc`
 
 ### Step 5: Create ECS Service
 1. In your cluster, go to **Services** -> **Create**.

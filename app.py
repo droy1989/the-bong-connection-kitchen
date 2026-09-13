@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from db import get_db, IS_POSTGRES
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "change-me")
-UPI_ID = os.getenv("UPI_ID", "titlibasu37@okaxis")
+UPI_ID = os.getenv("UPI_ID", "7829039536@hdfc")
 UPI_NAME = os.getenv("UPI_NAME", "The Bong Connection")
 
 # A customer browser session stores the supplied name and phone number. It is not

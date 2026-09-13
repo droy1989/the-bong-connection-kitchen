@@ -24,7 +24,7 @@ Parameters:
     Description: 'Set true once the public load balancer is served over HTTPS'
   UpiId:
     Type: String
-    Default: 'titlibasu37@okaxis'
+    Default: '7829039536@hdfc'
     Description: 'UPI ID for QR codes and payments'
   UpiName:
     Type: String

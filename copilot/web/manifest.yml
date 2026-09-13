@@ -39,7 +39,7 @@ storage:
 variables:
   PORT: "8000"
   DB_PATH: "/data/foodstall.db"
-  UPI_ID: "titlibasu37@okaxis"
+  UPI_ID: "7829039536@hdfc"
   UPI_NAME: "The Bong Connection"
   AWS_REGION: "ap-south-1"
 
