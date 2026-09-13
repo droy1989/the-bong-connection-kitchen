@@ -108,46 +108,106 @@ def init_db():
                 pass
         c.commit()
 
+    # Migration: Rename or merge Egg Noodles -> Egg Chowmein
+    noodle_row = c.execute("SELECT id FROM products WHERE name='Egg Noodles'").fetchone()
+    chowmein_row = c.execute("SELECT id FROM products WHERE name='Egg Chowmein'").fetchone()
+    if noodle_row:
+        if chowmein_row:
+            existing_dates = [r["menu_date"] for r in c.execute("SELECT menu_date FROM menu_dates WHERE product_id=?", (chowmein_row["id"],)).fetchall()]
+            for ed in existing_dates:
+                c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (noodle_row["id"], ed))
+            c.execute("UPDATE menu_dates SET product_id=? WHERE product_id=?", (chowmein_row["id"], noodle_row["id"]))
+            try:
+                c.execute("UPDATE order_items SET product_id=? WHERE product_id=?", (chowmein_row["id"], noodle_row["id"]))
+            except Exception:
+                pass
+            c.execute("DELETE FROM products WHERE id=?", (noodle_row["id"],))
+        else:
+            c.execute("UPDATE products SET name='Egg Chowmein', price=130, description='Bengali-style egg chowmein' WHERE id=?", (noodle_row["id"],))
+
+    # Aliases
+    aliases = {
+        "Egg-Mutton Roll": ["Egg Mutton Roll"],
+        "Gandhoraj Fish Fry": ["Gandhoraj Fish Fry (Single Serving)"],
+        "Chilled Mishti Doi": ["Chilled Misto Doi", "Misto Doi", "Mishti Doi"],
+        "Luchi + Mutton Curry": ["Luchi + Mutton Curry (4 pcs Luchi, 2 pcs mutton)", "Luchi + Mutton Curry Combo", "Luchi + Mutton Curry (4 Pcs Luchi, 2 Pcs Mutton)", "Combo: Luchi + Mutton Curry"],
+        "Basanti Polao + Mutton Curry": ["Basanti Polao + Mutton Curry Combo", "Basanti Polao + Mutton Curry(2 peice mutton)", "Basanti Polao + Mutton Curry (2 Pcs Mutton)", "Combo: Basanti Polao + Mutton Curry"],
+        "Mutton Curry (3 Pcs Mutton)": ["Mutton Curry", "Mutton Curry (3 Pcs)", "Mutton Curry( 3 peice Mutton)", "Mutton Curry (3 pcs Mutton)"],
+        "Veg Chop": ["Veg Chop (2 pcs)", "Veg Chop (2 peice)", "Veg Chop (2 Pcs)"],
+        "Baked Rasgulla Cups": ["Baked Rasgulla Cup", "Baked Rasgulla Cups (1 pc)", "Baked Rasgulla Cups (1 peice)"],
+    }
+
+    for canonical_name, alias_list in aliases.items():
+        can_row = c.execute("SELECT id FROM products WHERE name=?", (canonical_name,)).fetchone()
+        for alias in alias_list:
+            alias_row = c.execute("SELECT id FROM products WHERE name=?", (alias,)).fetchone()
+            if alias_row:
+                if can_row:
+                    if alias_row["id"] != can_row["id"]:
+                        existing_dates = [r["menu_date"] for r in c.execute("SELECT menu_date FROM menu_dates WHERE product_id=?", (can_row["id"],)).fetchall()]
+                        for ed in existing_dates:
+                            c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (alias_row["id"], ed))
+                        c.execute("UPDATE menu_dates SET product_id=? WHERE product_id=?", (can_row["id"], alias_row["id"]))
+                        try:
+                            c.execute("UPDATE order_items SET product_id=? WHERE product_id=?", (can_row["id"], alias_row["id"]))
+                        except Exception:
+                            pass
+                        c.execute("DELETE FROM products WHERE id=?", (alias_row["id"],))
+                else:
+                    c.execute("UPDATE products SET name=? WHERE id=?", (canonical_name, alias_row["id"]))
+                    can_row = alias_row
+
     products = [
         ("Egg Roll", "Bengali-style egg roll", 79, 30, "IN"),
         ("Egg-Chicken Roll", "Egg and chicken roll", 120, 40, "IN"),
         ("Egg-Mutton Roll", "Egg and mutton roll", 175, 30, "IN"),
         ("Chilli Chicken / Manchurian", "Chilli chicken / Manchurian", 180, 50, "IN"),
-        ("Egg Noodles", "Egg noodles", 150, 50, "IN"),
+        ("Egg Chowmein", "Bengali-style egg chowmein", 130, 50, "IN"),
+        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 150, 50, "IN"),
         ("Mutton Biriyani", "Mutton biriyani", 450, 50, "OUT"),
         ("Chicken Biriyani", "Chicken biriyani", 300, 50, "OUT"),
         ("Singara", "Crispy Bengali singara", 80, 50, "OUT"),
-        ("Egg Devil", "Bengali egg devil", 150, 50, "OUT"),
-        ("Chicken Cutlet", "Chicken cutlet", 50, 50, "OUT"),
-        ("Egg Chowmein", "Bengali-style egg chowmein", 130, 50, "IN"),
-        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 150, 50, "IN"),
+        ("Egg Devil", "Bengali egg devil", 120, 50, "OUT"),
+        ("Chicken Cutlet", "Crispy Bengali chicken cutlet", 150, 50, "OUT"),
         ("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 150, 50, "OUT"),
+        ("Bhetki Fish Fry", "Crispy Bengali Bhetki fish fry (single serving)", 150, 50, "OUT"),
+        ("Luchi + Mutton Curry", "Combo: 4 pcs Luchi, 2 pcs Mutton", 280, 50, "OUT"),
+        ("Mutton Curry (3 Pcs Mutton)", "Rich Bengali mutton curry (3 pcs Mutton)", 300, 50, "OUT"),
+        ("Basanti Polao + Mutton Curry", "Combo: Basanti Polao with 2 pcs Mutton", 450, 50, "OUT"),
+        ("Veg Chop", "Crispy Kolkata-style vegetable chop (2 pcs)", 100, 50, "OUT"),
+        ("Egg Fried Rice", "Kolkata-style egg fried rice", 150, 50, "IN"),
+        ("Egg Chicken Fried Rice", "Kolkata-style egg chicken fried rice", 175, 50, "IN"),
+        ("Mixed Fried Rice", "Special mixed fried rice with egg, chicken and prawns", 250, 50, "IN"),
+        ("Baked Rasgulla Cups", "Decadent baked rasgulla in a cup (1 pc)", 100, 50, "OUT"),
+        ("Chilled Mishti Doi", "Classic Bengali sweet curd, served chilled", 80, 50, "OUT"),
     ]
     dates = {
         "Egg Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg-Chicken Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg-Mutton Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Chilli Chicken / Manchurian": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Egg Noodles": ["2026-10-17", "2026-10-18", "2026-10-20"],
+        "Egg Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Egg Chicken Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Mutton Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Chicken Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Singara": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg Devil": ["2026-10-17", "2026-10-19"],
-        "Chicken Cutlet": ["2026-10-17", "2026-10-20"],
-        "Egg Chowmein": ["2026-10-16"],
-        "Egg Chicken Chowmein": ["2026-10-16"],
-        "Gandhoraj Fish Fry": ["2026-10-16"],
+        "Chicken Cutlet": ["2026-10-17", "2026-10-19", "2026-10-20"],
+        "Gandhoraj Fish Fry": ["2026-10-16", "2026-10-19", "2026-10-20"],
+        "Bhetki Fish Fry": ["2026-10-18"],
+        "Luchi + Mutton Curry": ["2026-10-18", "2026-10-19", "2026-10-20"],
+        "Mutton Curry (3 Pcs Mutton)": ["2026-10-18", "2026-10-19", "2026-10-20"],
+        "Basanti Polao + Mutton Curry": ["2026-10-18", "2026-10-19", "2026-10-20"],
+        "Veg Chop": ["2026-10-19"],
+        "Egg Fried Rice": ["2026-10-19"],
+        "Egg Chicken Fried Rice": ["2026-10-19"],
+        "Mixed Fried Rice": ["2026-10-19"],
+        "Baked Rasgulla Cups": ["2026-10-19"],
+        "Chilled Mishti Doi": ["2026-10-19", "2026-10-20"],
     }
 
     for name, desc, price, demand, sourcing in products:
         row = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()
-        if not row and name == "Egg-Mutton Roll":
-            row = c.execute("SELECT id FROM products WHERE name='Egg Mutton Roll'").fetchone()
-            if row:
-                c.execute("UPDATE products SET name=? WHERE id=?", (name, row["id"]))
-        if not row and name == "Gandhoraj Fish Fry":
-            row = c.execute("SELECT id FROM products WHERE name='Gandhoraj Fish Fry (Single Serving)'").fetchone()
-
         if row:
             c.execute(
                 "UPDATE products SET price=?, description=?, demand=?, sourcing=?, available=1 WHERE id=?",
