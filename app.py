@@ -108,39 +108,69 @@ def init_db():
                 pass
         c.commit()
 
-    if c.execute("SELECT COUNT(*) AS cnt FROM products").fetchone()["cnt"] == 0:
-        products = [
-            ("Egg Roll","Bengali-style egg roll",80,30,"IN"),
-            ("Egg-Chicken Roll","Egg and chicken roll",120,40,"IN"),
-            ("Egg-Mutton Roll","Egg and mutton roll",150,30,"IN"),
-            ("Chilli Chicken / Manchurian","Chilli chicken / Manchurian",180,50,"IN"),
-            ("Egg Noodles","Egg noodles",150,50,"IN"),
-            ("Mutton Biriyani","Mutton biriyani",150,50,"OUT"),
-            ("Chicken Biriyani","Chicken biriyani",400,50,"OUT"),
-            ("Singara","Crispy Bengali singara",300,50,"OUT"),
-            ("Egg Devil","Bengali egg devil",150,50,"OUT"),
-            ("Chicken Cutlet","Chicken cutlet",50,50,"OUT"),
-        ]
-        c.executemany(
-            "INSERT INTO products(name,description,price,demand,sourcing) VALUES(?,?,?,?,?)",
-            products
-        )
-        dates = {
-            "Egg Roll":["2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20"],
-            "Egg-Chicken Roll":["2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20"],
-            "Egg-Mutton Roll":["2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20"],
-            "Chilli Chicken / Manchurian":["2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20"],
-            "Egg Noodles":["2026-10-17","2026-10-18","2026-10-20"],
-            "Mutton Biriyani":["2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20"],
-            "Chicken Biriyani":["2026-10-16","2026-10-17","2026-10-18","2026-10-19","2026-10-20"],
-            "Singara":["2026-10-16","2026-10-17"],
-            "Egg Devil":["2026-10-17","2026-10-19"],
-            "Chicken Cutlet":["2026-10-17","2026-10-20"],
-        }
-        for name, ds in dates.items():
-            pid=c.execute("SELECT id FROM products WHERE name=?",(name,)).fetchone()["id"]
-            c.executemany("INSERT INTO menu_dates(product_id,menu_date) VALUES(?,?)",
-                          [(pid,d) for d in ds])
+    products = [
+        ("Egg Roll", "Bengali-style egg roll", 79, 30, "IN"),
+        ("Egg-Chicken Roll", "Egg and chicken roll", 120, 40, "IN"),
+        ("Egg-Mutton Roll", "Egg and mutton roll", 175, 30, "IN"),
+        ("Chilli Chicken / Manchurian", "Chilli chicken / Manchurian", 180, 50, "IN"),
+        ("Egg Noodles", "Egg noodles", 150, 50, "IN"),
+        ("Mutton Biriyani", "Mutton biriyani", 450, 50, "OUT"),
+        ("Chicken Biriyani", "Chicken biriyani", 300, 50, "OUT"),
+        ("Singara", "Crispy Bengali singara", 80, 50, "OUT"),
+        ("Egg Devil", "Bengali egg devil", 150, 50, "OUT"),
+        ("Chicken Cutlet", "Chicken cutlet", 50, 50, "OUT"),
+        ("Egg Chowmein", "Bengali-style egg chowmein", 130, 50, "IN"),
+        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 150, 50, "IN"),
+        ("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 150, 50, "OUT"),
+    ]
+    dates = {
+        "Egg Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Egg-Chicken Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Egg-Mutton Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Chilli Chicken / Manchurian": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Egg Noodles": ["2026-10-17", "2026-10-18", "2026-10-20"],
+        "Mutton Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Chicken Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Singara": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Egg Devil": ["2026-10-17", "2026-10-19"],
+        "Chicken Cutlet": ["2026-10-17", "2026-10-20"],
+        "Egg Chowmein": ["2026-10-16"],
+        "Egg Chicken Chowmein": ["2026-10-16"],
+        "Gandhoraj Fish Fry": ["2026-10-16"],
+    }
+
+    for name, desc, price, demand, sourcing in products:
+        row = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()
+        if not row and name == "Egg-Mutton Roll":
+            row = c.execute("SELECT id FROM products WHERE name='Egg Mutton Roll'").fetchone()
+            if row:
+                c.execute("UPDATE products SET name=? WHERE id=?", (name, row["id"]))
+        if not row and name == "Gandhoraj Fish Fry":
+            row = c.execute("SELECT id FROM products WHERE name='Gandhoraj Fish Fry (Single Serving)'").fetchone()
+
+        if row:
+            c.execute(
+                "UPDATE products SET price=?, description=?, demand=?, sourcing=?, available=1 WHERE id=?",
+                (price, desc, demand, sourcing, row["id"])
+            )
+            pid = row["id"]
+        else:
+            c.execute(
+                "INSERT INTO products(name, description, price, demand, sourcing, available) VALUES(?,?,?,?,?,1)",
+                (name, desc, price, demand, sourcing)
+            )
+            pid = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()["id"]
+
+        for d in dates.get(name, []):
+            exists = c.execute(
+                "SELECT 1 FROM menu_dates WHERE product_id=? AND menu_date=?",
+                (pid, d)
+            ).fetchone()
+            if not exists:
+                c.execute(
+                    "INSERT INTO menu_dates(product_id, menu_date) VALUES(?,?)",
+                    (pid, d)
+                )
     c.commit(); c.close()
 
 init_db()

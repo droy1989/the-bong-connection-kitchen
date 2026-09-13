@@ -90,16 +90,19 @@ Fresh Lime 50
 
 The app is preloaded with the supplied 16–20 October 2026 menu and prices.
 
-- Egg Roll — ₹80 — demand 30 — sourcing IN
-- Egg-Chicken Roll — ₹120 — demand 40 — sourcing IN
-- Egg-Mutton Roll — ₹150 — demand 30 — sourcing IN
-- Chilli Chicken / Manchurian — ₹180 — demand 50 — sourcing IN
-- Egg Noodles — ₹150 — demand 50 — sourcing IN
-- Mutton Biriyani — ₹150 — demand 50 — sourcing OUT
-- Chicken Biriyani — ₹400 — demand 50 — sourcing OUT
-- Singara — ₹300 — demand 50 — sourcing OUT
-- Egg Devil — ₹150 — demand 50 — sourcing OUT
-- Chicken Cutlet — ₹50 — demand 50 — sourcing OUT
+- Egg Roll — ₹79 — demand 30 — sourcing IN (All days)
+- Egg-Chicken Roll — ₹120 — demand 40 — sourcing IN (All days)
+- Egg-Mutton Roll — ₹175 — demand 30 — sourcing IN (All days)
+- Chilli Chicken / Manchurian — ₹180 — demand 50 — sourcing IN (All days)
+- Egg Noodles — ₹150 — demand 50 — sourcing IN (17, 18, 20 Oct)
+- Mutton Biriyani — ₹450 — demand 50 — sourcing OUT (All days)
+- Chicken Biriyani — ₹300 — demand 50 — sourcing OUT (All days)
+- Singara — ₹80 — demand 50 — sourcing OUT (All days)
+- Egg Devil — ₹150 — demand 50 — sourcing OUT (17, 19 Oct)
+- Chicken Cutlet — ₹50 — demand 50 — sourcing OUT (17, 20 Oct)
+- Egg Chowmein — ₹130 — demand 50 — sourcing IN (16 Oct Sasti)
+- Egg Chicken Chowmein — ₹150 — demand 50 — sourcing IN (16 Oct Sasti)
+- Gandhoraj Fish Fry — ₹150 (single serving) — demand 50 — sourcing OUT (16 Oct Sasti)
 
 The customer menu automatically filters items by the selected date.
 
