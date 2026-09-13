@@ -72,7 +72,7 @@ jobs:
           
           UPI_ID_VAL="${{ secrets.UPI_ID }}"
           if [ -z "$UPI_ID_VAL" ]; then
-            UPI_ID_VAL="titlibasu37@okaxis"
+            UPI_ID_VAL="7829039536@hdfc"
           fi
 
           UPI_NAME_VAL="${{ secrets.UPI_NAME }}"
