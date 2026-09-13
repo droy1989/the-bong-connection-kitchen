@@ -22,14 +22,10 @@ Parameters:
     Default: 'false'
     AllowedValues: ['true', 'false']
     Description: 'Set true once the public load balancer is served over HTTPS'
-  UpiId:
-    Type: String
-    Default: '7829039536@hdfc'
-    Description: 'UPI ID for QR codes and payments'
-  UpiName:
-    Type: String
-    Default: 'The Bong Connection'
-    Description: 'Business/Stall name shown on UPI apps'
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    Description: 'RDS storage size in GB'
   DBUsername:
     Type: String
     Default: 'bongadmin'
@@ -43,10 +39,20 @@ Parameters:
     Type: String
     Default: 'db.t4g.micro'
     Description: 'RDS instance size (db.t4g.micro is Free-Tier eligible in most regions)'
-  DBAllocatedStorage:
-    Type: Number
-    Default: 20
-    Description: 'RDS storage size in GB'
+  RazorpayKeyId:
+    Type: String
+    Default: ''
+    Description: 'Razorpay API Key ID (public, e.g. rzp_live_xxxx)'
+  RazorpayKeySecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: 'Razorpay API Key Secret (private)'
+  RazorpayWebhookSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: 'Razorpay webhook signing secret, set in the Razorpay Dashboard webhook config'
 
 Resources:
   # ------------------------------------------------------------
@@ -400,12 +406,14 @@ Resources:
               Value: !Sub 'postgresql://${DBUsername}:${DBPassword}@${DBInstance.Endpoint.Address}:${DBInstance.Endpoint.Port}/bongconnection'
             - Name: ADMIN_KEY
               Value: !Ref AdminKey
-            - Name: UPI_ID
-              Value: !Ref UpiId
-            - Name: UPI_NAME
-              Value: !Ref UpiName
             - Name: AUTH_COOKIE_SECURE
               Value: !Ref AuthCookieSecure
+            - Name: RAZORPAY_KEY_ID
+              Value: !Ref RazorpayKeyId
+            - Name: RAZORPAY_KEY_SECRET
+              Value: !Ref RazorpayKeySecret
+            - Name: RAZORPAY_WEBHOOK_SECRET
+              Value: !Ref RazorpayWebhookSecret
           LogConfiguration:
             LogDriver: awslogs
             Options:

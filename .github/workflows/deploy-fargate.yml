@@ -70,16 +70,6 @@ jobs:
             exit 1
           fi
           
-          UPI_ID_VAL="${{ secrets.UPI_ID }}"
-          if [ -z "$UPI_ID_VAL" ]; then
-            UPI_ID_VAL="7829039536@hdfc"
-          fi
-
-          UPI_NAME_VAL="${{ secrets.UPI_NAME }}"
-          if [ -z "$UPI_NAME_VAL" ]; then
-            UPI_NAME_VAL="The Bong Connection"
-          fi
-
           AUTH_COOKIE_SECURE_VAL="${{ secrets.AUTH_COOKIE_SECURE }}"
           if [ -z "$AUTH_COOKIE_SECURE_VAL" ]; then
             AUTH_COOKIE_SECURE_VAL="true"
@@ -96,6 +86,24 @@ jobs:
             DB_USERNAME_VAL="bongadmin"
           fi
 
+          RAZORPAY_KEY_ID_VAL="${{ secrets.RAZORPAY_KEY_ID }}"
+          if [ -z "$RAZORPAY_KEY_ID_VAL" ]; then
+            echo "Missing required GitHub secret: RAZORPAY_KEY_ID"
+            exit 1
+          fi
+
+          RAZORPAY_KEY_SECRET_VAL="${{ secrets.RAZORPAY_KEY_SECRET }}"
+          if [ -z "$RAZORPAY_KEY_SECRET_VAL" ]; then
+            echo "Missing required GitHub secret: RAZORPAY_KEY_SECRET"
+            exit 1
+          fi
+
+          # Optional for now: the webhook secret only exists once you've created the
+          # webhook in the Razorpay Dashboard (which needs the live site URL first).
+          # Until it's set, the /api/webhooks/razorpay endpoint just stays inactive;
+          # direct signature verification on the checkout page still works fine.
+          RAZORPAY_WEBHOOK_SECRET_VAL="${{ secrets.RAZORPAY_WEBHOOK_SECRET }}"
+
           echo "Deploying CloudFormation stack: ${{ env.STACK_NAME }} in ${{ env.AWS_REGION }}..."
           aws cloudformation deploy \
             --template-file aws/fargate-template.yaml \
@@ -108,10 +116,11 @@ jobs:
                 AdminKey="$ADMIN_KEY_VAL" \
                 CertificateArn="$CERTIFICATE_ARN_VAL" \
                 AuthCookieSecure="$AUTH_COOKIE_SECURE_VAL" \
-                UpiId="$UPI_ID_VAL" \
-                UpiName="$UPI_NAME_VAL" \
                 DBUsername="$DB_USERNAME_VAL" \
                 DBPassword="$DB_PASSWORD_VAL" \
+                RazorpayKeyId="$RAZORPAY_KEY_ID_VAL" \
+                RazorpayKeySecret="$RAZORPAY_KEY_SECRET_VAL" \
+                RazorpayWebhookSecret="$RAZORPAY_WEBHOOK_SECRET_VAL" \
             --no-fail-on-empty-changeset
 
       - name: Fetch and Display Live Application URLs

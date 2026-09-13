@@ -4,21 +4,35 @@
 body{font-family:system-ui;text-align:center;background:#f7f7f7;padding:25px;color:#222}
 .card{background:white;padding:25px;border-radius:18px;max-width:500px;margin:auto;box-shadow:0 2px 10px #ddd}
 .brand{font-weight:800}.token{font-size:82px;font-weight:900;margin:5px}
-.status{display:inline-block;padding:9px 14px;border-radius:20px;background:#eee;font-weight:800}
-.ready{background:#d8f5df;color:#126b2e}.prep{background:#fff1c9;color:#795900}
+.status-badge{display:inline-block;padding:9px 14px;border-radius:20px;background:#eee;font-weight:800}
+.ready{background:#d8f5df;color:#126b2e}.prep{background:#fff1c9;color:#795900}.waiting{background:#e8eef8;color:#1a3a7a}
 hr{border:0;border-top:1px solid #ddd;margin:20px 0}
 </style></head><body><div class="card">
-<div class="brand">🪔 THE BONG CONNECTION</div><h1>Order Status</h1>
-<div>Your queue number</div><div class="token" id="token">-</div>
-<div id="status" class="status">Loading...</div><div id="message" style="margin-top:12px"></div>
-<hr><div id="items"></div><h2 id="total"></h2></div>
+<div class="brand">&#127774; THE BONG CONNECTION</div><h1>Order Status</h1>
+<div>Your queue number</div><div class="token" id="tokenEl">-</div>
+<div id="statusEl" class="status-badge">Loading...</div><div id="messageEl" style="margin-top:12px"></div>
+<hr><div id="itemsEl"></div><h2 id="totalEl"></h2></div>
 <script>
-const id=new URLSearchParams(location.search).get('id');
-async function load(){let r=await fetch('/api/orders/'+id);if(!r.ok)return;let o=await r.json();
-token.textContent='#'+o.token;status.textContent=o.order_status;
-status.className='status '+(o.order_status==='READY'?'ready':o.order_status==='PREPARING'?'prep':'');
-message.textContent=o.order_status==='READY'?'🎉 Please collect your order from the counter.':o.order_status==='PREPARING'?'👨‍🍳 Your food is being prepared.':'⏳ Your order is in the queue.';
-items.innerHTML=o.items.map(x=>`${x.quantity} × ${x.name} — ₹${x.price*x.quantity}`).join('<br>');
-total.textContent='Total ₹'+o.total;if(o.order_status!=='DELIVERED')setTimeout(load,3000)}
+var id=new URLSearchParams(location.search).get('id');
+async function load(){
+    try{
+        var r=await fetch('/api/orders/'+id);
+        if(!r.ok)return;
+        var o=await r.json();
+        var tokenEl=document.getElementById('tokenEl');
+        var statusEl=document.getElementById('statusEl');
+        var messageEl=document.getElementById('messageEl');
+        var itemsEl=document.getElementById('itemsEl');
+        var totalEl=document.getElementById('totalEl');
+        tokenEl.textContent='#'+o.token;
+        var label=o.order_status==='READY'?'READY':o.order_status==='PREPARING'?'Preparing...':o.order_status==='DELIVERED'?'Delivered':'In Queue';
+        statusEl.textContent=label;
+        statusEl.className='status-badge '+(o.order_status==='READY'?'ready':o.order_status==='PREPARING'?'prep':o.order_status==='WAITING'?'waiting':'');
+        messageEl.textContent=o.order_status==='READY'?'Collect your order from the counter.':o.order_status==='PREPARING'?'Your food is being prepared.':o.order_status==='DELIVERED'?'Order delivered. Thank you!':'Your order is in the queue.';
+        itemsEl.innerHTML=o.items.map(function(x){return x.quantity+' x '+x.name+' - Rs.'+(x.price*x.quantity);}).join('<br>');
+        totalEl.textContent='Total Rs.'+o.total;
+        if(o.order_status!=='DELIVERED')setTimeout(load,3000);
+    }catch(e){console.error(e);}
+}
 load();
 </script></body></html>

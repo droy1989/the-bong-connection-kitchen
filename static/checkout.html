@@ -4,13 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>The Bong Connection • Checkout & Payment</title>
-
-    <!-- Google Fonts -->
+    <title>The Bong Connection &bull; Checkout &amp; Payment</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
-
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -30,7 +30,7 @@
             content: "";
             position: fixed;
             inset: -15px;
-            background: linear-gradient(rgba(255, 247, 232, 0.45), rgba(255, 247, 232, 0.50)), url('/static/durga-puja.jpg');
+            background: linear-gradient(rgba(255, 247, 232, .45), rgba(255, 247, 232, .50)), url('/static/durga-puja.jpg');
             background-size: cover;
             background-position: center top;
             filter: blur(4px);
@@ -46,12 +46,11 @@
         .header-card {
             text-align: center;
             background: linear-gradient(135deg, #641010, #a91616 50%, #741010);
-            color: white;
+            color: #fff;
             padding: 24px 20px;
             border-radius: 24px;
             box-shadow: 0 8px 25px rgba(100, 30, 10, .22);
             margin-bottom: 20px;
-            position: relative;
             overflow: hidden;
         }
 
@@ -69,7 +68,7 @@
         }
 
         .card {
-            background: rgba(255, 253, 249, 0.96);
+            background: rgba(255, 253, 249, .96);
             border-radius: 20px;
             padding: 22px;
             margin-bottom: 20px;
@@ -134,7 +133,6 @@
             color: #7b1010;
         }
 
-        /* Payment Buttons */
         .payment-options {
             display: flex;
             flex-direction: column;
@@ -153,20 +151,77 @@
             text-decoration: none;
             font-size: 17px;
             font-weight: 800;
-            color: white;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, .15);
+            transition: transform .15s ease, box-shadow .15s ease;
             cursor: pointer;
             border: none;
         }
 
         .pay-app-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
         }
 
         .pay-app-btn:active {
-            transform: scale(0.98);
+            transform: scale(.98);
+        }
+
+        .btn-razorpay {
+            background: linear-gradient(135deg, #072654, #1a53ba);
+            font-size: 18px;
+            padding: 18px 20px;
+            box-shadow: 0 6px 20px rgba(7, 38, 84, .35);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-razorpay::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, .08), transparent);
+        }
+
+        .btn-razorpay:hover {
+            box-shadow: 0 8px 24px rgba(7, 38, 84, .45);
+        }
+
+        .btn-razorpay:disabled {
+            background: #888;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .razorpay-badge {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255, 255, 255, .15);
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+        }
+
+        .divider-or {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 18px 0 4px;
+            color: #999;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .divider-or::before,
+        .divider-or::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #ead8b9;
         }
 
         .btn-gpay {
@@ -187,7 +242,6 @@
             align-items: center;
         }
 
-        /* QR Code section */
         .qr-section {
             text-align: center;
             margin-top: 22px;
@@ -197,11 +251,11 @@
 
         .qr-box {
             display: inline-block;
-            background: white;
+            background: #fff;
             padding: 14px;
             border-radius: 16px;
             border: 2px solid #e3c896;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .06);
             margin: 12px 0;
         }
 
@@ -227,7 +281,7 @@
 
         .copy-btn {
             background: #7b1010;
-            color: white;
+            color: #fff;
             border: none;
             padding: 4px 10px;
             border-radius: 6px;
@@ -236,12 +290,11 @@
             font-weight: 700;
         }
 
-        /* Confirm button */
         .confirm-btn {
             display: block;
             width: 100%;
             background: linear-gradient(135deg, #16823b, #25994b);
-            color: white;
+            color: #fff;
             font-size: 18px;
             font-weight: 800;
             padding: 16px;
@@ -249,8 +302,8 @@
             border: none;
             cursor: pointer;
             margin-top: 14px;
-            box-shadow: 0 4px 15px rgba(22, 130, 59, 0.3);
-            transition: transform 0.15s ease, background 0.15s ease;
+            box-shadow: 0 4px 15px rgba(22, 130, 59, .3);
+            transition: transform .15s ease, background .15s ease;
             text-align: center;
         }
 
@@ -269,19 +322,18 @@
         .step-badge {
             display: inline-block;
             background: #16823b;
-            color: white;
+            color: #fff;
             font-size: 11px;
             font-weight: 800;
             padding: 3px 9px;
             border-radius: 6px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: .5px;
             margin-bottom: 8px;
         }
 
         .utr-input {
             width: 100%;
-            box-sizing: border-box;
             padding: 12px 14px;
             border: 2px solid #b7dfc6;
             border-radius: 10px;
@@ -289,14 +341,14 @@
             font-weight: 600;
             color: #171717;
             background: #fff;
-            letter-spacing: 0.5px;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            letter-spacing: .5px;
+            transition: border-color .2s, box-shadow .2s;
         }
 
         .utr-input:focus {
             outline: none;
             border-color: #16823b;
-            box-shadow: 0 0 0 3px rgba(22, 130, 59, 0.15);
+            box-shadow: 0 0 0 3px rgba(22, 130, 59, .15);
         }
 
         .back-link {
@@ -317,273 +369,152 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
 
 <body>
-
     <div class="wrap">
-        <a href="/" class="back-link">← Back to Menu</a>
-
+        <a href="/" class="back-link">&#8592; Back to Menu</a>
         <div class="header-card">
-            <h1>🪔 The Bong Connection</h1>
-            <div class="bengali-sub">দুর্গাপূজা স্পেশাল • Order Checkout</div>
+            <h1>&#127774; The Bong Connection</h1>
+            <div class="bengali-sub">&#2470;&#2497;&#2480;&#2509;&#2455;&#2494;&#2474;&#2499;&#2460;&#2494;
+                &#2488;&#2509;&#2474;&#2503;&#2486;&#2494;&#2482; &bull; Order Checkout</div>
         </div>
-
-        <div id="content" class="loading-state">
-            Loading order details...
-        </div>
+        <div id="content" class="loading-state">Loading order details...</div>
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(location.search);
-        const orderId = urlParams.get('id');
+        var urlParams = new URLSearchParams(location.search);
+        var orderId = urlParams.get('id');
+        var razorpayKeyId = '';
 
         async function loadCheckout() {
-            const content = document.getElementById("content");
-
-            if (!orderId) {
-                content.innerHTML = `
-                    <div class="card" style="text-align:center;">
-                        <h2>Order Not Found</h2>
-                        <p>No order ID provided.</p>
-                        <a href="/" class="pay-app-btn btn-gpay" style="display:inline-block; width:auto; padding:10px 20px;">Return to Menu</a>
-                    </div>
-                `;
-                return;
-            }
-
+            var content = document.getElementById("content");
+            if (!orderId) { content.innerHTML = '<div class="card" style="text-align:center"><h2>Order Not Found</h2><p>No order ID provided.</p><a href="/" class="pay-app-btn btn-gpay" style="display:inline-block;width:auto;padding:10px 20px">Return to Menu</a></div>'; return; }
             try {
-                const response = await fetch('/api/orders/' + orderId);
-                if (!response.ok) {
-                    content.innerHTML = `
-                        <div class="card" style="text-align:center;">
-                            <h2>Order Not Found</h2>
-                            <p>Unable to retrieve order details.</p>
-                            <a href="/" class="pay-app-btn btn-gpay" style="display:inline-block; width:auto; padding:10px 20px;">Return to Menu</a>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const order = await response.json();
-                const configRes = await fetch('/api/config');
-                const config = configRes.ok ? await configRes.json() : { upi_id: 'thebongconnection@upi', upi_name: 'The Bong Connection' };
-
-                const upiId = config.upi_id || 'thebongconnection@upi';
-                const upiName = config.upi_name || 'The Bong Connection';
-                const totalFormatted = order.total.toFixed(2);
-                const note = encodeURIComponent(`Food Order Token #${order.token}`);
-                const encodedName = encodeURIComponent(upiName);
-                const ref = `FOOD-${order.id}`;
-
-                // UPI intent URIs
-                const genericUpi = `upi://pay?pa=${upiId}&pn=${encodedName}&am=${totalFormatted}&cu=INR&tn=${note}&tr=${ref}`;
-                const gpayUpi = `tez://upi/pay?pa=${upiId}&pn=${encodedName}&am=${totalFormatted}&cu=INR&tn=${note}&tr=${ref}`;
-                const phonepeUpi = `phonepe://pay?pa=${upiId}&pn=${encodedName}&am=${totalFormatted}&cu=INR&tn=${note}&tr=${ref}`;
-
-                // Dynamic QR code API link
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(genericUpi)}`;
-
-                const itemsHtml = order.items.map(item => `
-                    <tr>
-                        <td><strong>${escapeHtml(item.name)}</strong> × ${item.quantity}</td>
-                        <td class="price-col">₹${item.price * item.quantity}</td>
-                    </tr>
-                `).join('');
-
-                content.innerHTML = `
-                    <div class="card">
-                        <div class="card-title">🛍️ Order Summary</div>
-
-                        <div style="text-align:center;">
-                            <div class="token-badge">Token #${order.token}</div>
-                        </div>
-
-                        <table class="order-items-table">
-                            <tbody>
-                                ${itemsHtml}
-                            </tbody>
-                        </table>
-
-                        <div class="total-row">
-                            <span>Total Amount</span>
-                            <span>₹${order.total}</span>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title">💳 Pay via Mobile App</div>
-                        <p style="margin: 0 0 16px 0; font-size:14px; color:#666;">
-                            Tap your preferred app to automatically open it with order amount prefilled:
-                        </p>
-
-                        <div class="payment-options">
-                            <a href="${gpayUpi}" class="pay-app-btn btn-gpay" onclick="handlePayClick(event, '${gpayUpi}')">
-                                <span class="btn-icon">🟢</span> Pay with Google Pay
-                            </a>
-
-                            <a href="${phonepeUpi}" class="pay-app-btn btn-phonepe" onclick="handlePayClick(event, '${phonepeUpi}')">
-                                <span class="btn-icon">🟣</span> Pay with PhonePe
-                            </a>
-
-                            <a href="${genericUpi}" class="pay-app-btn btn-upi" onclick="handlePayClick(event, '${genericUpi}')">
-                                <span class="btn-icon">🔵</span> Pay with Paytm / Any UPI App
-                            </a>
-                        </div>
-
-                        <div class="qr-section">
-                            <div style="font-size:15px; font-weight:700; color:#641010; margin-bottom:4px;">
-                                Or Scan QR Code to Pay
-                            </div>
-                            <div style="font-size:13px; color:#666;">
-                                Scan using Google Pay, PhonePe, Paytm, or BHIM
-                            </div>
-
-                            <div class="qr-box">
-                                <img src="${qrUrl}" alt="UPI Payment QR Code" />
-                            </div>
-
-                            <div>
-                                <div class="upi-id-display">
-                                    <span>UPI ID: <span id="upiIdText">${escapeHtml(upiId)}</span></span>
-                                    <button type="button" class="copy-btn" onclick="copyUpi()">Copy</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card" style="border: 2px solid #16823b; background: #fbfffb;">
-                        <span class="step-badge" style="background:#16823b;">Step 2: Place Order</span>
-                        <div class="card-title" style="color:#126b2e; margin-bottom:8px;">
-                            ✅ Payment Acknowledgment
-                        </div>
-                        <p style="margin: 0 0 14px 0; font-size:14px; color:#333; line-height:1.5;">
-                            Once you have completed payment of <strong>₹${order.total}</strong> to <strong><span style="color:#641010;">${escapeHtml(upiId)}</span></strong>, submit acknowledgment below to send your order directly to the kitchen:
-                        </p>
-
-                        <div style="margin-bottom: 12px;">
-                            <label for="utrInput" style="display:block; font-size:13px; font-weight:700; color:#333; margin-bottom:6px;">
-                                12-digit UPI Reference / UTR No. (Optional):
-                            </label>
-                            <input 
-                                type="text" 
-                                id="utrInput" 
-                                class="utr-input"
-                                placeholder="e.g. 425612345678" 
-                                maxlength="24"
-                                autocomplete="off"
-                            />
-                            <div style="font-size:12px; color:#666; margin-top:5px;">
-                                Available on your Google Pay / PhonePe / Paytm payment success screen.
-                            </div>
-                        </div>
-
-                        <button 
-                            type="button" 
-                            class="confirm-btn" 
-                            id="confirmBtn" 
-                            onclick="submitPaymentAcknowledgement(${order.id})"
-                        >
-                            ✅ I Have Paid — Place My Order
-                        </button>
-                        <div id="ackError" style="color:#d32f2f; font-size:13px; font-weight:700; margin-top:10px; display:none; text-align:center;"></div>
-                    </div>
-
-                    <div class="card" style="text-align:center; padding: 18px 20px;">
-                        <div id="pollingStatus" style="font-size:14px; font-weight:600; color:#641010; display:flex; align-items:center; justify-content:center; gap:10px;">
-                            <div class="spinner-pulse" style="width:20px; height:20px; border:3px solid #f3e5ca; border-top:3px solid #a91616; border-radius:50%; animation:spin 1s linear infinite;"></div>
-                            <div>Awaiting payment acknowledgment. Tap the green button above once paid.</div>
-                        </div>
-                    </div>
-                `;
-
+                var response = await fetch('/api/orders/' + orderId);
+                if (!response.ok) { content.innerHTML = '<div class="card" style="text-align:center"><h2>Order Not Found</h2><p>Unable to retrieve order details.</p><a href="/" class="pay-app-btn btn-gpay" style="display:inline-block;width:auto;padding:10px 20px">Return to Menu</a></div>'; return; }
+                var order = await response.json();
+                var configRes = await fetch('/api/config');
+                var config = configRes.ok ? await configRes.json() : {};
+                razorpayKeyId = config.razorpay_key_id || '';
+                var itemsHtml = order.items.map(function (item) { return '<tr><td><strong>' + escapeHtml(item.name) + '</strong> &times; ' + item.quantity + '</td><td class="price-col">&#8377;' + (item.price * item.quantity) + '</td></tr>'; }).join('');
+                var rzpBtn = razorpayKeyId ? ('<button type="button" id="razorpayBtn" class="pay-app-btn btn-razorpay" onclick="openRazorpay(' + order.id + ',' + order.total + ')">' +
+                    '<span class="btn-icon" style="margin-right:8px">&#128179;</span><span style="margin-right:8px">Pay &#8377;' + order.total + ' Securely</span><span class="razorpay-badge" style="margin-left:8px">Razorpay</span>' +
+                    '</button><div style="font-size:12px;color:#666;text-align:center;margin-top:-4px">Cards &middot; UPI &middot; NetBanking &middot; Wallets &mdash; Confirmed automatically &#10003;</div>') :
+                    '<div style="color:#d32f2f;font-weight:700;text-align:center">Online payment is temporarily unavailable. Please check with the stall staff.</div>';
+                content.innerHTML =
+                    '<div class="card">' +
+                    '<div class="card-title">&#128717; Order Summary</div>' +
+                    '<div style="text-align:center"><div class="token-badge">Token #' + order.token + '</div></div>' +
+                    '<table class="order-items-table"><tbody>' + itemsHtml + '</tbody></table>' +
+                    '<div class="total-row"><span>Total Amount</span><span>&#8377;' + order.total + '</span></div>' +
+                    '</div>' +
+                    '<div class="card">' +
+                    '<div class="card-title">&#128179; Complete Payment</div>' +
+                    '<div id="rzpError" style="color:#d32f2f;font-size:13px;font-weight:700;margin-bottom:10px;display:none"></div>' +
+                    rzpBtn +
+                    '</div>' +
+                    '<div class="card" style="text-align:center;padding:18px 20px">' +
+                    '<div id="pollingStatus" style="font-size:14px;font-weight:600;color:#641010;display:flex;align-items:center;justify-content:center;gap:10px">' +
+                    '<div style="width:20px;height:20px;border:3px solid #f3e5ca;border-top:3px solid #a91616;border-radius:50%;animation:spin 1s linear infinite"></div>' +
+                    '<div>Awaiting payment confirmation. Pay above to place your order in the queue.</div>' +
+                    '</div>' +
+                    '</div>';
                 startAutoPolling(order.id);
-
             } catch (err) {
                 console.error(err);
-                content.innerHTML = `
-                    <div class="card" style="text-align:center;">
-                        <h2>Error</h2>
-                        <p>Something went wrong loading order details.</p>
-                        <a href="/" class="pay-app-btn btn-gpay" style="display:inline-block; width:auto; padding:10px 20px;">Return to Menu</a>
-                    </div>
-                `;
+                content.innerHTML = '<div class="card" style="text-align:center"><h2>Error</h2><p>Something went wrong loading order details.</p><a href="/" class="pay-app-btn btn-gpay" style="display:inline-block;width:auto;padding:10px 20px">Return to Menu</a></div>';
             }
         }
 
-        let pollInterval = null;
-        function startAutoPolling(id) {
-            if (pollInterval) clearInterval(pollInterval);
-            pollInterval = setInterval(async () => {
-                try {
-                    const r = await fetch(`/api/orders/${id}`);
-                    if (r.ok) {
-                        const data = await r.json();
-                        if (data.payment_status === 'PAID') {
-                            clearInterval(pollInterval);
-                            const statusEl = document.getElementById("pollingStatus");
-                            if (statusEl) {
-                                statusEl.innerHTML = `
-                                    <div style="font-size:40px; margin-bottom:6px;">🎉</div>
-                                    <div style="font-size:18px; color:#16823b; font-weight:800;">Payment Successful!</div>
-                                    <div style="font-size:14px; color:#555;">Opening your live order & queue position...</div>
-                                `;
-                            }
-                            setTimeout(() => {
-                                location.href = `/static/order.html?id=${id}`;
-                            }, 1000);
+        async function openRazorpay(localOrderId, totalRupees) {
+            var btn = document.getElementById('razorpayBtn');
+            var errEl = document.getElementById('rzpError');
+            if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+            if (btn) { btn.disabled = true; btn.textContent = 'Creating secure payment...'; }
+            try {
+                var res = await fetch('/api/create-razorpay-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: localOrderId }) });
+                if (!res.ok) { var e = await res.json().catch(function () { return {}; }); throw new Error(e.detail || 'Could not create payment order'); }
+                var rzpData = await res.json();
+                var options = {
+                    key: rzpData.key_id,
+                    amount: rzpData.amount,
+                    currency: rzpData.currency,
+                    name: 'The Bong Connection',
+                    description: 'Order #' + localOrderId,
+                    order_id: rzpData.razorpay_order_id,
+                    handler: async function (response) {
+                        await verifyRazorpayPayment(localOrderId, response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
+                    },
+                    notes: { local_order_id: localOrderId },
+                    theme: { color: '#a91616' },
+                    modal: {
+                        ondismiss: function () {
+                            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon" style="margin-right:8px">&#128179;</span><span style="margin-right:8px">Pay &#8377;' + totalRupees + ' Securely</span><span class="razorpay-badge" style="margin-left:8px">Razorpay</span>'; }
                         }
                     }
-                } catch (e) {
-                    console.error("Polling error:", e);
-                }
+                };
+                var rzp = new Razorpay(options);
+                rzp.on('payment.failed', function (response) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon" style="margin-right:8px">&#128179;</span><span style="margin-right:8px">Pay &#8377;' + totalRupees + ' Securely</span><span class="razorpay-badge" style="margin-left:8px">Razorpay</span>'; }
+                    if (errEl) { errEl.textContent = 'Payment failed: ' + (response.error.description || 'Please try again.'); errEl.style.display = 'block'; }
+                });
+                rzp.open();
+            } catch (e) {
+                console.error(e);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon" style="margin-right:8px">&#128179;</span><span style="margin-right:8px">Pay &#8377;' + totalRupees + ' Securely</span><span class="razorpay-badge" style="margin-left:8px">Razorpay</span>'; }
+                if (errEl) { errEl.textContent = e.message || 'Something went wrong. Please try again.'; errEl.style.display = 'block'; }
+            }
+        }
+
+        async function verifyRazorpayPayment(localOrderId, paymentId, rzpOrderId, signature) {
+            var errEl = document.getElementById('rzpError');
+            try {
+                var res = await fetch('/api/verify-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ local_order_id: localOrderId, razorpay_payment_id: paymentId, razorpay_order_id: rzpOrderId, razorpay_signature: signature }) });
+                if (!res.ok) { var e = await res.json().catch(function () { return {}; }); throw new Error(e.detail || 'Signature verification failed'); }
+                var statusEl = document.getElementById('pollingStatus');
+                if (statusEl) { statusEl.innerHTML = '<div style="font-size:40px;margin-bottom:6px">&#127881;</div><div style="font-size:18px;color:#16823b;font-weight:800">Payment Successful!</div><div style="font-size:14px;color:#555">Opening your live order &amp; queue position...</div>'; }
+                setTimeout(function () { location.href = '/static/order.html?id=' + localOrderId; }, 1000);
+            } catch (e) {
+                console.error(e);
+                if (errEl) { errEl.textContent = 'Payment verification failed: ' + (e.message || 'Please contact support.'); errEl.style.display = 'block'; }
+            }
+        }
+
+        var pollInterval = null;
+        function startAutoPolling(id) {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async function () {
+                try {
+                    var r = await fetch('/api/orders/' + id);
+                    if (r.ok) {
+                        var data = await r.json();
+                        if (data.payment_status === 'PAID') {
+                            clearInterval(pollInterval);
+                            var statusEl = document.getElementById('pollingStatus');
+                            if (statusEl) { statusEl.innerHTML = '<div style="font-size:40px;margin-bottom:6px">&#127881;</div><div style="font-size:18px;color:#16823b;font-weight:800">Payment Successful!</div><div style="font-size:14px;color:#555">Opening your live order &amp; queue position...</div>'; }
+                            setTimeout(function () { location.href = '/static/order.html?id=' + id; }, 1000);
+                        }
+                    }
+                } catch (e) { console.error('Polling error:', e); }
             }, 1500);
         }
 
-        function handlePayClick(event, uri) {
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            if (!isMobile) {
-                // On desktop browser, warn user to scan QR code
-                event.preventDefault();
-                alert("📱 UPI app deep links open directly on mobile devices.\n\nOn desktop, please scan the QR code below using Google Pay, PhonePe, or Paytm on your phone!");
-            }
-        }
-
-        async function confirmPayment(id) {
-            try {
-                const response = await fetch(`/api/orders/${id}/confirm`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ utr_number: "" })
-                });
-                location.href = `/static/order.html?id=${id}`;
-            } catch (e) {
-                console.error(e);
-                location.href = `/static/order.html?id=${id}`;
-            }
-        }
-
-        function copyUpi() {
-            const text = document.getElementById("upiIdText").innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                alert("UPI ID copied to clipboard!");
-            });
-        }
-
         function escapeHtml(value) {
-            return String(value)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         }
 
         loadCheckout();
     </script>
 </body>
+
 </html>

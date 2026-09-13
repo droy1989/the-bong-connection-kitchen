@@ -1,6 +1,6 @@
-import os, json, base64, secrets, time
-from urllib.parse import quote
+import os, json, base64, secrets, time, hashlib, hmac
 from dotenv import load_dotenv
+import razorpay
 
 load_dotenv()
 
@@ -13,8 +13,11 @@ from pydantic import BaseModel
 from db import get_db, IS_POSTGRES
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "change-me")
-UPI_ID = os.getenv("UPI_ID", "7829039536@hdfc")
-UPI_NAME = os.getenv("UPI_NAME", "The Bong Connection")
+
+# Razorpay Standard Checkout configuration. Secret is server-side only.
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+
 
 # A customer browser session stores the supplied name and phone number. It is not
 # identity verification; it simply keeps simultaneous customer orders separate.
@@ -254,6 +257,15 @@ class OrderIn(BaseModel):
 class ConfirmIn(BaseModel):
     utr_number: str | None = ""
 
+class RazorpayOrderIn(BaseModel):
+    order_id: int   # our local DB order id
+
+class RazorpayVerifyIn(BaseModel):
+    razorpay_payment_id: str
+    razorpay_order_id: str
+    razorpay_signature: str
+    local_order_id: int  # our local DB order id
+
 class CustomerSessionIn(BaseModel):
     name: str
     phone: str
@@ -324,7 +336,9 @@ def display():
 
 @app.get("/api/config")
 def config():
-    return {"upi_id": UPI_ID, "upi_name": UPI_NAME}
+    return {
+        "razorpay_key_id": RAZORPAY_KEY_ID,
+    }
 
 @app.get("/api/products")
 def products(menu_date: str | None = None):
@@ -388,24 +402,10 @@ def create_order(order: OrderIn, request: Request):
 
     c.commit(); c.close()
 
-    note = f"Food Order Token #{token}"
-    ref = f"FOOD-{oid}"
-
-    upi_link = f"upi://pay?pa={UPI_ID}&pn={quote(UPI_NAME)}&am={total:.2f}&cu=INR&tn={quote(note)}&tr={ref}"
-    gpay_link = f"tez://upi/pay?pa={UPI_ID}&pn={quote(UPI_NAME)}&am={total:.2f}&cu=INR&tn={quote(note)}&tr={ref}"
-    phonepe_link = f"phonepe://pay?pa={UPI_ID}&pn={quote(UPI_NAME)}&am={total:.2f}&cu=INR&tn={quote(note)}&tr={ref}"
-    paytm_link = f"paytmmp://pay?pa={UPI_ID}&pn={quote(UPI_NAME)}&am={total:.2f}&cu=INR&tn={quote(note)}&tr={ref}"
-
     return {
         "order_id": oid,
         "token": token,
         "total": total,
-        "upi_id": UPI_ID,
-        "upi_name": UPI_NAME,
-        "upi_link": upi_link,
-        "gpay_link": gpay_link,
-        "phonepe_link": phonepe_link,
-        "paytm_link": paytm_link
     }
 
 @app.post("/api/orders/{oid}/confirm")
@@ -538,4 +538,99 @@ def public_display():
     return {
         "now_serving": ready["token"] if ready else None,
         "queue":[x["token"] for x in pending]
+    }
+
+
+# ────────────────────────────────────────────────────────────
+# Razorpay Standard Checkout endpoints
+# ────────────────────────────────────────────────────────────
+
+@app.post("/api/create-razorpay-order")
+def create_razorpay_order(body: RazorpayOrderIn):
+    """Create a Razorpay order for an existing local order and return the Razorpay order_id."""
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(500, "Razorpay is not configured on the server")
+
+    c = db()
+    order = c.execute("SELECT * FROM orders WHERE id=?", (body.order_id,)).fetchone()
+    c.close()
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order["payment_status"] == "PAID":
+        raise HTTPException(400, "Order is already paid")
+
+    amount_paise = order["total"] * 100  # Razorpay amount is in paise
+    if amount_paise < 100:
+        raise HTTPException(400, "Amount must be at least ₹1 (100 paise)")
+
+    try:
+        client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        rzp_order = client.order.create({
+            "amount": amount_paise,
+            "currency": "INR",
+            "receipt": f"FOOD-{body.order_id}",
+            "payment_capture": 1,
+        })
+    except Exception as e:
+        raise HTTPException(500, f"Razorpay order creation failed: {e}")
+
+    # Persist the Razorpay order_id against our local order
+    c = db()
+    c.execute(
+        "UPDATE orders SET razorpay_order_id=? WHERE id=?",
+        (rzp_order["id"], body.order_id)
+    )
+    c.commit(); c.close()
+
+    return {
+        "razorpay_order_id": rzp_order["id"],
+        "amount": amount_paise,
+        "currency": "INR",
+        "key_id": RAZORPAY_KEY_ID,
+    }
+
+
+@app.post("/api/verify-payment")
+def verify_razorpay_payment(body: RazorpayVerifyIn):
+    """Verify Razorpay's checkout signature and mark the local order PAID."""
+    if not RAZORPAY_KEY_SECRET:
+        raise HTTPException(500, "Razorpay is not configured on the server")
+
+    required = [
+        body.razorpay_payment_id.strip(),
+        body.razorpay_order_id.strip(),
+        body.razorpay_signature.strip()
+    ]
+    if not all(required):
+        raise HTTPException(400, "Missing Razorpay payment fields")
+
+    # HMAC-SHA256 verification
+    payload = f"{body.razorpay_order_id}|{body.razorpay_payment_id}"
+    expected = hmac.new(
+        RAZORPAY_KEY_SECRET.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, body.razorpay_signature):
+        raise HTTPException(400, "Payment signature mismatch — possible tampering")
+
+    # Signature valid: mark order as PAID and store Razorpay IDs
+    c = db()
+    order = c.execute("SELECT * FROM orders WHERE id=?", (body.local_order_id,)).fetchone()
+    if not order:
+        c.close()
+        raise HTTPException(404, "Order not found")
+
+    c.execute(
+        "UPDATE orders SET payment_status='PAID', razorpay_payment_id=?, razorpay_order_id=? WHERE id=?",
+        (body.razorpay_payment_id, body.razorpay_order_id, body.local_order_id)
+    )
+    c.commit(); c.close()
+
+    return {
+        "ok": True,
+        "order_id": body.local_order_id,
+        "payment_id": body.razorpay_payment_id,
+        "status": "PAID",
     }

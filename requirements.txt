@@ -3,3 +3,4 @@ uvicorn[standard]==0.35.0
 pydantic==2.11.7
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
+razorpay==1.4.2
