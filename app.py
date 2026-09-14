@@ -336,6 +336,10 @@ def checkout_page():
 def admin():
     return FileResponse("static/admin.html")
 
+@app.get("/admin/summary")
+def admin_summary():
+    return FileResponse("static/kitchen-summary.html")
+
 @app.get("/admin/menu")
 def admin_menu():
     return FileResponse("static/menu-admin.html")

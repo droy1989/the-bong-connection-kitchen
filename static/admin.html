@@ -27,6 +27,18 @@
             margin: 0
         }
 
+        header nav {
+            margin-top: 6px;
+            display: flex;
+            gap: 14px;
+            justify-content: center
+        }
+
+        header nav a {
+            color: #9cf;
+            font-size: 13px
+        }
+
         .login {
             max-width: 500px;
             margin: 18px auto;
@@ -135,7 +147,7 @@
     <header>
         <h1>🪔 THE BONG CONNECTION</h1>
         <div>Kitchen Queue</div>
-        <div style="margin-top:6px"><a href="/admin/menu" style="color:#9cf;font-size:13px">🍽️ Manage Menu</a></div>
+        <nav><a href="/admin/summary">📋 Order Summary</a><a href="/admin/menu">🍽️ Manage Menu</a></nav>
     </header>
     <div class="login"><input id="key" type="password" placeholder="Admin key">
         <button class="btn" onclick="login()">Login</button> <span id="msg" class="small"></span>
@@ -161,9 +173,9 @@
             let items = o.items.map(x => `${x.quantity} × ${x.name}`).join('<br>'), action = '';
             let utrHtml = o.utr_number ? `<div class="small" style="color:#0066cc;font-weight:bold;margin:4px 0;">UTR: ${o.utr_number}</div>` : '';
             let custHtml = (o.customer_name || o.customer_phone) ? `<div style="font-size:13px;font-weight:bold;color:#b71c1c;margin:4px 0;">👤 ${o.customer_name || 'Customer'} (${o.customer_phone || 'No phone'})</div>` : '';
-            if (o.order_status === 'WAITING') action = `<button class="btn start" onclick="setStatus(${o.id},'PREPARING')">START</button>`;
-            if (o.order_status === 'PREPARING') action = `<button class="btn ready" onclick="setStatus(${o.id},'READY')">READY</button>`;
-            if (o.order_status === 'READY') action = `<button class="btn deliver" onclick="setStatus(${o.id},'DELIVERED')">DELIVERED</button>`;
+            if (o.order_status === 'WAITING') action = `<button class="btn start" onclick="setStatus(${o.id},'PREPARING')">Start Preparing</button>`;
+            if (o.order_status === 'PREPARING') action = `<button class="btn ready" onclick="setStatus(${o.id},'READY')">Mark as Ready</button>`;
+            if (o.order_status === 'READY') action = `<button class="btn deliver" onclick="setStatus(${o.id},'DELIVERED')">Mark as Delivered</button>`;
             return `<div class="order"><div class="token">#${o.token}</div>${custHtml}<div class="items">${items}</div><div class="total">₹${o.total}</div>${utrHtml}${action}</div>`;
         }
         function draw(id, arr) { document.getElementById(id).innerHTML = arr.length ? arr.map(card).join('') : '<div class="empty">No orders</div>' }
@@ -173,9 +185,10 @@
             if (!r.ok) { msg.textContent = 'Invalid admin key'; return }
             msg.textContent = 'Auto-refresh: 3 sec';
             let os = await r.json();
-            draw('paid', os.filter(o => o.order_status === 'WAITING'));
-            draw('preparing', os.filter(o => o.order_status === 'PREPARING'));
-            draw('ready', os.filter(o => o.order_status === 'READY'));
+            let active = os.filter(o => o.order_status !== 'DELIVERED');
+            draw('paid', active.filter(o => o.order_status === 'WAITING'));
+            draw('preparing', active.filter(o => o.order_status === 'PREPARING'));
+            draw('ready', active.filter(o => o.order_status === 'READY'));
         }
         async function setStatus(id, s) {
             let r = await fetch(`/api/orders/${id}/status?new_status=${s}`, { method: 'PATCH', headers: { 'X-Admin-Key': key } });
