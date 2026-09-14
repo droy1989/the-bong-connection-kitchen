@@ -119,6 +119,72 @@
             color: #777
         }
 
+        .summary {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 16px
+        }
+
+        .summary-bar {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 14px
+        }
+
+        .stat {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 18px;
+            box-shadow: 0 1px 4px #ccc;
+            text-align: center;
+            min-width: 110px
+        }
+
+        .stat .num {
+            font-size: 26px;
+            font-weight: 900
+        }
+
+        .stat .lbl {
+            font-size: 12px;
+            color: #777;
+            font-weight: 700
+        }
+
+        .prep {
+            background: white;
+            border-radius: 14px;
+            padding: 14px 16px;
+            box-shadow: 0 1px 4px #ccc
+        }
+
+        .prep h3 {
+            margin: 0 0 10px
+        }
+
+        .prep-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px
+        }
+
+        .prep-item {
+            background: #fff3e0;
+            border: 1.5px solid #f0a83d;
+            border-radius: 20px;
+            padding: 7px 14px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #7a4a00
+        }
+
+        .prep-item .qty {
+            font-size: 16px;
+            color: #b91c1c;
+            margin-right: 4px
+        }
+
         @media(max-width:800px) {
             .board {
                 grid-template-columns: 1fr
@@ -139,6 +205,26 @@
     </header>
     <div class="login"><input id="key" type="password" placeholder="Admin key">
         <button class="btn" onclick="login()">Login</button> <span id="msg" class="small"></span>
+    </div>
+    <div class="summary" id="summary" style="display:none">
+        <div class="summary-bar">
+            <div class="stat">
+                <div class="num" id="statOrders">0</div>
+                <div class="lbl">ORDERS IN QUEUE</div>
+            </div>
+            <div class="stat">
+                <div class="num" id="statItems">0</div>
+                <div class="lbl">ITEMS TO PREPARE</div>
+            </div>
+            <div class="stat">
+                <div class="num" id="statRevenue">₹0</div>
+                <div class="lbl">QUEUE VALUE</div>
+            </div>
+        </div>
+        <div class="prep">
+            <h3>👨‍🍳 What the chef needs to prepare right now</h3>
+            <div class="prep-list" id="prepList"></div>
+        </div>
     </div>
     <div class="board">
         <section class="col">
@@ -167,15 +253,38 @@
             return `<div class="order"><div class="token">#${o.token}</div>${custHtml}<div class="items">${items}</div><div class="total">₹${o.total}</div>${utrHtml}${action}</div>`;
         }
         function draw(id, arr) { document.getElementById(id).innerHTML = arr.length ? arr.map(card).join('') : '<div class="empty">No orders</div>' }
+        function renderSummary(activeOrders) {
+            document.getElementById('summary').style.display = 'block';
+            const totalOrders = activeOrders.length;
+            const totalRevenue = activeOrders.reduce((sum, o) => sum + o.total, 0);
+
+            // Aggregate quantities per item across every active order — this is the
+            // actual "what to cook" list, independent of which order it came from.
+            const itemQty = {};
+            activeOrders.forEach(o => {
+                o.items.forEach(x => { itemQty[x.name] = (itemQty[x.name] || 0) + x.quantity; });
+            });
+            const totalItems = Object.values(itemQty).reduce((a, b) => a + b, 0);
+            const sortedItems = Object.entries(itemQty).sort((a, b) => b[1] - a[1]);
+
+            document.getElementById('statOrders').textContent = totalOrders;
+            document.getElementById('statItems').textContent = totalItems;
+            document.getElementById('statRevenue').textContent = '₹' + totalRevenue;
+            document.getElementById('prepList').innerHTML = sortedItems.length
+                ? sortedItems.map(([name, qty]) => `<span class="prep-item"><span class="qty">${qty}×</span>${name}</span>`).join('')
+                : '<span class="small">Nothing in the queue right now.</span>';
+        }
         async function load() {
             if (!key) { msg.textContent = 'Enter admin key'; return }
             let r = await fetch('/api/orders', { headers: { 'X-Admin-Key': key } });
             if (!r.ok) { msg.textContent = 'Invalid admin key'; return }
             msg.textContent = 'Auto-refresh: 3 sec';
             let os = await r.json();
-            draw('paid', os.filter(o => o.order_status === 'WAITING'));
-            draw('preparing', os.filter(o => o.order_status === 'PREPARING'));
-            draw('ready', os.filter(o => o.order_status === 'READY'));
+            let active = os.filter(o => o.order_status !== 'DELIVERED');
+            draw('paid', active.filter(o => o.order_status === 'WAITING'));
+            draw('preparing', active.filter(o => o.order_status === 'PREPARING'));
+            draw('ready', active.filter(o => o.order_status === 'READY'));
+            renderSummary(active);
         }
         async function setStatus(id, s) {
             let r = await fetch(`/api/orders/${id}/status?new_status=${s}`, { method: 'PATCH', headers: { 'X-Admin-Key': key } });
