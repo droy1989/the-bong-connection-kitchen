@@ -336,6 +336,10 @@ def checkout_page():
 def admin():
     return FileResponse("static/admin.html")
 
+@app.get("/admin/menu")
+def admin_menu():
+    return FileResponse("static/menu-admin.html")
+
 @app.get("/display")
 def display():
     return FileResponse("static/display.html")
@@ -505,6 +509,112 @@ def update_status(oid:int,new_status:str,x_admin_key: str | None = Header(defaul
     c.execute("UPDATE orders SET order_status=? WHERE id=?",(new_status,oid))
     c.commit(); c.close()
     return {"ok":True}
+
+
+class ProductIn(BaseModel):
+    id: int | None = None
+    name: str
+    description: str | None = ""
+    price: int
+    demand: int | None = 50
+    sourcing: str | None = "OUT"
+    available: bool | None = True
+    dates: list[str]
+
+@app.get("/api/admin/products")
+def admin_list_products(x_admin_key: str | None = Header(default=None)):
+    """
+    Full menu (including sold-out/unavailable items), each with its exact
+    list of menu dates attached — used by the menu management screen.
+    """
+    require_admin(x_admin_key)
+    c = db()
+    rows = c.execute("SELECT * FROM products ORDER BY id").fetchall()
+    out = []
+    for r in rows:
+        d = c.execute(
+            "SELECT menu_date FROM menu_dates WHERE product_id=? ORDER BY menu_date",
+            (r["id"],)
+        ).fetchall()
+        out.append({**dict(r), "dates": [x["menu_date"] for x in d]})
+    c.close()
+    return out
+
+@app.post("/api/admin/products")
+def admin_upsert_product(body: ProductIn, x_admin_key: str | None = Header(default=None)):
+    """
+    Create a new menu item, or update an existing one (matched by id if given,
+    otherwise by name). 'dates' is the COMPLETE list of dates this item should
+    appear on — any date not included gets removed, any new date gets added.
+    No redeploy needed: this writes straight to the live database.
+    """
+    require_admin(x_admin_key)
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "Name is required")
+    if body.price < 0:
+        raise HTTPException(400, "Price cannot be negative")
+
+    c = db()
+    row = None
+    if body.id is not None:
+        row = c.execute("SELECT id FROM products WHERE id=?", (body.id,)).fetchone()
+        if not row:
+            c.close()
+            raise HTTPException(404, "Product not found")
+    else:
+        row = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()
+
+    available_val = 1 if body.available else 0
+    if row:
+        pid = row["id"]
+        c.execute(
+            "UPDATE products SET name=?, description=?, price=?, demand=?, sourcing=?, available=? WHERE id=?",
+            (name, body.description or "", body.price, body.demand or 0, body.sourcing or "OUT", available_val, pid)
+        )
+    else:
+        insert_sql = """INSERT INTO products(name, description, price, demand, sourcing, available)
+                         VALUES(?,?,?,?,?,?)"""
+        insert_params = (name, body.description or "", body.price, body.demand or 0, body.sourcing or "OUT", available_val)
+        if c.is_postgres:
+            cur = c.execute(insert_sql + " RETURNING id", insert_params)
+            pid = cur.fetchone()["id"]
+        else:
+            cur = c.execute(insert_sql, insert_params)
+            pid = cur.lastrowid
+
+    target_dates = set(d.strip() for d in body.dates if d.strip())
+    current_dates = {r["menu_date"] for r in c.execute(
+        "SELECT menu_date FROM menu_dates WHERE product_id=?", (pid,)
+    ).fetchall()}
+    for cd in current_dates - target_dates:
+        c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (pid, cd))
+    for d in target_dates - current_dates:
+        c.execute("INSERT INTO menu_dates(product_id, menu_date) VALUES(?,?)", (pid, d))
+
+    c.commit()
+    result = dict(c.execute("SELECT * FROM products WHERE id=?", (pid,)).fetchone())
+    result["dates"] = sorted(target_dates)
+    c.close()
+    return result
+
+@app.delete("/api/admin/products/{pid}")
+def admin_delete_product(pid: int, x_admin_key: str | None = Header(default=None)):
+    """
+    Permanently removes a menu item and its date associations. Safe to do even
+    after it's been ordered before — past orders keep their own copy of the
+    item's name/price in order_items, so order history is unaffected.
+    """
+    require_admin(x_admin_key)
+    c = db()
+    row = c.execute("SELECT id FROM products WHERE id=?", (pid,)).fetchone()
+    if not row:
+        c.close()
+        raise HTTPException(404, "Product not found")
+    c.execute("DELETE FROM menu_dates WHERE product_id=?", (pid,))
+    c.execute("DELETE FROM products WHERE id=?", (pid,))
+    c.commit(); c.close()
+    return {"ok": True}
 
 
 @app.get("/api/menu-dates")

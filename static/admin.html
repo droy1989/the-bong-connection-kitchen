@@ -1,55 +1,188 @@
 <!doctype html>
-<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The Bong Connection — Kitchen</title>
-<style>
-*{box-sizing:border-box}body{font-family:system-ui;margin:0;background:#f4f4f4;color:#171717}
-header{background:#111;color:white;padding:16px;text-align:center}header h1{margin:0}
-.login{max-width:500px;margin:18px auto;padding:14px;background:white;border-radius:12px}
-input{padding:10px;border:1px solid #ccc;border-radius:8px;width:70%}
-.btn{border:0;padding:11px 14px;border-radius:9px;background:#111;color:#fff;font-weight:700;cursor:pointer}
-.board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px;max-width:1400px;margin:auto}
-.col{background:#e9e9e9;border-radius:14px;padding:12px;min-height:70vh}
-.col h2{margin:5px 0 12px;text-align:center}.order{background:white;border-radius:12px;padding:14px;margin:10px 0;box-shadow:0 1px 4px #ccc}
-.token{font-size:30px;font-weight:900}.items{margin:8px 0}.total{font-weight:800;margin:8px 0}
-.btn.start{background:#155eef}.btn.ready{background:#16833b}.btn.deliver{background:#555;width:100%}
-.empty{text-align:center;color:#777;padding:25px}.small{font-size:12px;color:#777}
-@media(max-width:800px){.board{grid-template-columns:1fr}.col{min-height:auto}}
-</style></head>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>The Bong Connection — Kitchen</title>
+    <style>
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: system-ui;
+            margin: 0;
+            background: #f4f4f4;
+            color: #171717
+        }
+
+        header {
+            background: #111;
+            color: white;
+            padding: 16px;
+            text-align: center
+        }
+
+        header h1 {
+            margin: 0
+        }
+
+        .login {
+            max-width: 500px;
+            margin: 18px auto;
+            padding: 14px;
+            background: white;
+            border-radius: 12px
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            width: 70%
+        }
+
+        .btn {
+            border: 0;
+            padding: 11px 14px;
+            border-radius: 9px;
+            background: #111;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            padding: 16px;
+            max-width: 1400px;
+            margin: auto
+        }
+
+        .col {
+            background: #e9e9e9;
+            border-radius: 14px;
+            padding: 12px;
+            min-height: 70vh
+        }
+
+        .col h2 {
+            margin: 5px 0 12px;
+            text-align: center
+        }
+
+        .order {
+            background: white;
+            border-radius: 12px;
+            padding: 14px;
+            margin: 10px 0;
+            box-shadow: 0 1px 4px #ccc
+        }
+
+        .token {
+            font-size: 30px;
+            font-weight: 900
+        }
+
+        .items {
+            margin: 8px 0
+        }
+
+        .total {
+            font-weight: 800;
+            margin: 8px 0
+        }
+
+        .btn.start {
+            background: #155eef
+        }
+
+        .btn.ready {
+            background: #16833b
+        }
+
+        .btn.deliver {
+            background: #555;
+            width: 100%
+        }
+
+        .empty {
+            text-align: center;
+            color: #777;
+            padding: 25px
+        }
+
+        .small {
+            font-size: 12px;
+            color: #777
+        }
+
+        @media(max-width:800px) {
+            .board {
+                grid-template-columns: 1fr
+            }
+
+            .col {
+                min-height: auto
+            }
+        }
+    </style>
+</head>
+
 <body>
-<header><h1>🪔 THE BONG CONNECTION</h1><div>Kitchen Queue</div></header>
-<div class="login"><input id="key" type="password" placeholder="Admin key">
-<button class="btn" onclick="login()">Login</button> <span id="msg" class="small"></span></div>
-<div class="board">
-<section class="col"><h2>💳 PAID</h2><div id="paid"></div></section>
-<section class="col"><h2>👨‍🍳 PREPARING</h2><div id="preparing"></div></section>
-<section class="col"><h2>📦 READY</h2><div id="ready"></div></section>
-</div>
-<script>
-let key=localStorage.getItem('adminKey')||''; document.getElementById('key').value=key;
-function login(){key=document.getElementById('key').value;localStorage.setItem('adminKey',key);load()}
-function card(o){
- let items=o.items.map(x=>`${x.quantity} × ${x.name}`).join('<br>'), action='';
- let utrHtml = o.utr_number ? `<div class="small" style="color:#0066cc;font-weight:bold;margin:4px 0;">UTR: ${o.utr_number}</div>` : '';
- let custHtml = (o.customer_name || o.customer_phone) ? `<div style="font-size:13px;font-weight:bold;color:#b71c1c;margin:4px 0;">👤 ${o.customer_name || 'Customer'} (${o.customer_phone || 'No phone'})</div>` : '';
- if(o.order_status==='WAITING') action=`<button class="btn start" onclick="setStatus(${o.id},'PREPARING')">START</button>`;
- if(o.order_status==='PREPARING') action=`<button class="btn ready" onclick="setStatus(${o.id},'READY')">READY</button>`;
- if(o.order_status==='READY') action=`<button class="btn deliver" onclick="setStatus(${o.id},'DELIVERED')">DELIVERED</button>`;
- return `<div class="order"><div class="token">#${o.token}</div>${custHtml}<div class="items">${items}</div><div class="total">₹${o.total}</div>${utrHtml}${action}</div>`;
-}
-function draw(id,arr){document.getElementById(id).innerHTML=arr.length?arr.map(card).join(''):'<div class="empty">No orders</div>'}
-async function load(){
- if(!key){msg.textContent='Enter admin key';return}
- let r=await fetch('/api/orders',{headers:{'X-Admin-Key':key}});
- if(!r.ok){msg.textContent='Invalid admin key';return}
- msg.textContent='Auto-refresh: 3 sec';
- let os=await r.json();
- draw('paid',os.filter(o=>o.order_status==='WAITING'));
- draw('preparing',os.filter(o=>o.order_status==='PREPARING'));
- draw('ready',os.filter(o=>o.order_status==='READY'));
-}
-async function setStatus(id,s){
- let r=await fetch(`/api/orders/${id}/status?new_status=${s}`,{method:'PATCH',headers:{'X-Admin-Key':key}});
- if(!r.ok)return alert('Could not update order'); load();
-}
-load();setInterval(load,3000);
-</script></body></html>
+    <header>
+        <h1>🪔 THE BONG CONNECTION</h1>
+        <div>Kitchen Queue</div>
+        <div style="margin-top:6px"><a href="/admin/menu" style="color:#9cf;font-size:13px">🍽️ Manage Menu</a></div>
+    </header>
+    <div class="login"><input id="key" type="password" placeholder="Admin key">
+        <button class="btn" onclick="login()">Login</button> <span id="msg" class="small"></span>
+    </div>
+    <div class="board">
+        <section class="col">
+            <h2>💳 PAID</h2>
+            <div id="paid"></div>
+        </section>
+        <section class="col">
+            <h2>👨‍🍳 PREPARING</h2>
+            <div id="preparing"></div>
+        </section>
+        <section class="col">
+            <h2>📦 READY</h2>
+            <div id="ready"></div>
+        </section>
+    </div>
+    <script>
+        let key = localStorage.getItem('adminKey') || ''; document.getElementById('key').value = key;
+        function login() { key = document.getElementById('key').value; localStorage.setItem('adminKey', key); load() }
+        function card(o) {
+            let items = o.items.map(x => `${x.quantity} × ${x.name}`).join('<br>'), action = '';
+            let utrHtml = o.utr_number ? `<div class="small" style="color:#0066cc;font-weight:bold;margin:4px 0;">UTR: ${o.utr_number}</div>` : '';
+            let custHtml = (o.customer_name || o.customer_phone) ? `<div style="font-size:13px;font-weight:bold;color:#b71c1c;margin:4px 0;">👤 ${o.customer_name || 'Customer'} (${o.customer_phone || 'No phone'})</div>` : '';
+            if (o.order_status === 'WAITING') action = `<button class="btn start" onclick="setStatus(${o.id},'PREPARING')">START</button>`;
+            if (o.order_status === 'PREPARING') action = `<button class="btn ready" onclick="setStatus(${o.id},'READY')">READY</button>`;
+            if (o.order_status === 'READY') action = `<button class="btn deliver" onclick="setStatus(${o.id},'DELIVERED')">DELIVERED</button>`;
+            return `<div class="order"><div class="token">#${o.token}</div>${custHtml}<div class="items">${items}</div><div class="total">₹${o.total}</div>${utrHtml}${action}</div>`;
+        }
+        function draw(id, arr) { document.getElementById(id).innerHTML = arr.length ? arr.map(card).join('') : '<div class="empty">No orders</div>' }
+        async function load() {
+            if (!key) { msg.textContent = 'Enter admin key'; return }
+            let r = await fetch('/api/orders', { headers: { 'X-Admin-Key': key } });
+            if (!r.ok) { msg.textContent = 'Invalid admin key'; return }
+            msg.textContent = 'Auto-refresh: 3 sec';
+            let os = await r.json();
+            draw('paid', os.filter(o => o.order_status === 'WAITING'));
+            draw('preparing', os.filter(o => o.order_status === 'PREPARING'));
+            draw('ready', os.filter(o => o.order_status === 'READY'));
+        }
+        async function setStatus(id, s) {
+            let r = await fetch(`/api/orders/${id}/status?new_status=${s}`, { method: 'PATCH', headers: { 'X-Admin-Key': key } });
+            if (!r.ok) return alert('Could not update order'); load();
+        }
+        load(); setInterval(load, 3000);
+    </script>
+</body>
+
+</html>

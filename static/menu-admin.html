@@ -1,0 +1,341 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>The Bong Connection — Menu Manager</title>
+    <style>
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: system-ui;
+            margin: 0;
+            background: #f4f4f4;
+            color: #171717
+        }
+
+        header {
+            background: #111;
+            color: white;
+            padding: 16px;
+            text-align: center
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 20px
+        }
+
+        header a {
+            color: #9cf;
+            font-size: 13px
+        }
+
+        .login {
+            max-width: 600px;
+            margin: 18px auto;
+            padding: 14px;
+            background: white;
+            border-radius: 12px
+        }
+
+        input,
+        select {
+            padding: 9px;
+            border: 1px solid #ccc;
+            border-radius: 8px
+        }
+
+        input[type=text],
+        input[type=number] {
+            width: 100%
+        }
+
+        .btn {
+            border: 0;
+            padding: 10px 14px;
+            border-radius: 9px;
+            background: #111;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer
+        }
+
+        .btn.green {
+            background: #16833b
+        }
+
+        .btn.red {
+            background: #b91c1c
+        }
+
+        .btn.small {
+            padding: 6px 10px;
+            font-size: 12px
+        }
+
+        .wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 16px
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 1px 4px #ddd
+        }
+
+        .card.sold-out {
+            opacity: 0.55
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 8px
+        }
+
+        .row label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 3px
+        }
+
+        .field {
+            flex: 1;
+            min-width: 110px
+        }
+
+        .dates {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0
+        }
+
+        .date-chip {
+            padding: 6px 10px;
+            border-radius: 20px;
+            border: 1.5px solid #ccc;
+            font-size: 12px;
+            cursor: pointer;
+            user-select: none
+        }
+
+        .date-chip.on {
+            background: #7b1010;
+            color: #fff;
+            border-color: #7b1010
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px
+        }
+
+        .small {
+            font-size: 12px;
+            color: #777
+        }
+
+        .name-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px
+        }
+
+        .name-row input {
+            font-weight: 800;
+            font-size: 16px;
+            border: none;
+            background: transparent;
+            padding: 4px 0
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background: #eee;
+            color: #555
+        }
+
+        #addCard {
+            border: 2px dashed #999;
+            background: #fafafa
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>🪔 Menu Manager</h1>
+        <div><a href="/admin">← Back to Kitchen Queue</a></div>
+    </header>
+    <div class="login">
+        <input id="key" type="password" placeholder="Admin key" style="width:60%">
+        <button class="btn" onclick="login()">Login</button>
+        <span id="msg" class="small"></span>
+    </div>
+
+    <div class="wrap" id="wrap" style="display:none">
+        <div class="card" id="addCard">
+            <div class="row"><strong>+ Add New Item</strong></div>
+            <div id="addFields"></div>
+        </div>
+        <div id="products"></div>
+    </div>
+
+    <script>
+        let key = localStorage.getItem('adminKey') || '';
+        document.getElementById('key').value = key;
+
+        // Keep this list in sync with the event's actual dates. Add more entries here
+        // if the event window changes — every item's date-picker pulls from this list.
+        const ALL_DATES = [
+            ["2026-10-16", "16 Oct · Sasti"],
+            ["2026-10-17", "17 Oct · Saptami"],
+            ["2026-10-18", "18 Oct · Saptami"],
+            ["2026-10-19", "19 Oct · Ashtami"],
+            ["2026-10-20", "20 Oct · Navami"],
+            ["2026-10-21", "21 Oct · Dasami"]
+        ];
+
+        function login() {
+            key = document.getElementById('key').value;
+            localStorage.setItem('adminKey', key);
+            load();
+        }
+
+        function dateChips(selected, prefix) {
+            return ALL_DATES.map(([d, label]) => {
+                const on = selected.includes(d);
+                return `<span class="date-chip ${on ? 'on' : ''}" data-date="${d}" onclick="toggleChip(this)">${label}</span>`;
+            }).join('');
+        }
+
+        function toggleChip(el) { el.classList.toggle('on'); }
+
+        function fieldsHtml(p, idPrefix) {
+            p = p || { name: '', description: '', price: 0, demand: 50, sourcing: 'OUT', available: true, dates: [] };
+            return `
+    <div class="row">
+      <div class="field"><label>Name</label><input type="text" id="${idPrefix}-name" value="${escapeHtml(p.name)}" placeholder="Item name"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Description</label><input type="text" id="${idPrefix}-desc" value="${escapeHtml(p.description || '')}" placeholder="Short description"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Price (₹)</label><input type="number" id="${idPrefix}-price" value="${p.price}" min="0"></div>
+      <div class="field"><label>Sourcing</label>
+        <select id="${idPrefix}-sourcing" style="width:100%">
+          <option value="IN" ${p.sourcing === 'IN' ? 'selected' : ''}>IN (in-house)</option>
+          <option value="OUT" ${p.sourcing === 'OUT' ? 'selected' : ''}>OUT (sourced)</option>
+        </select>
+      </div>
+      <div class="field"><label>Available on menu</label>
+        <select id="${idPrefix}-available" style="width:100%">
+          <option value="true" ${p.available ? 'selected' : ''}>Yes</option>
+          <option value="false" ${!p.available ? 'selected' : ''}>No (sold out / hidden)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row"><label style="width:100%">Available on these dates</label></div>
+    <div class="dates" id="${idPrefix}-dates">${dateChips(p.dates || [], idPrefix)}</div>
+  `;
+        }
+
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        }
+
+        function readFields(idPrefix, existingId) {
+            const dates = [...document.querySelectorAll(`#${idPrefix}-dates .date-chip.on`)].map(el => el.dataset.date);
+            return {
+                id: existingId ?? null,
+                name: document.getElementById(`${idPrefix}-name`).value.trim(),
+                description: document.getElementById(`${idPrefix}-desc`).value.trim(),
+                price: parseInt(document.getElementById(`${idPrefix}-price`).value || '0', 10),
+                demand: 50,
+                sourcing: document.getElementById(`${idPrefix}-sourcing`).value,
+                available: document.getElementById(`${idPrefix}-available`).value === 'true',
+                dates
+            };
+        }
+
+        async function load() {
+            if (!key) { msg.textContent = 'Enter admin key'; return; }
+            const r = await fetch('/api/admin/products', { headers: { 'X-Admin-Key': key } });
+            if (!r.ok) { msg.textContent = 'Invalid admin key'; document.getElementById('wrap').style.display = 'none'; return; }
+            msg.textContent = 'Logged in';
+            document.getElementById('wrap').style.display = 'block';
+            const products = await r.json();
+
+            document.getElementById('addFields').innerHTML = fieldsHtml(null, 'add') +
+                `<div class="actions"><button class="btn green" onclick="createProduct()">Add Item</button></div>`;
+
+            const list = document.getElementById('products');
+            list.innerHTML = products.map(p => {
+                const idp = `p${p.id}`;
+                return `
+      <div class="card ${p.available ? '' : 'sold-out'}">
+        <div class="name-row">
+          <span class="badge">#${p.id}</span>
+          <span class="badge">${p.available ? 'Live' : 'Hidden'}</span>
+        </div>
+        ${fieldsHtml(p, idp)}
+        <div class="actions">
+          <button class="btn small green" onclick="saveProduct(${p.id}, '${idp}')">Save Changes</button>
+          <button class="btn small red" onclick="deleteProduct(${p.id}, '${escapeHtml(p.name)}')">Delete Item</button>
+        </div>
+      </div>
+    `;
+            }).join('') || '<div class="small">No menu items yet — add one above.</div>';
+        }
+
+        async function createProduct() {
+            const body = readFields('add', null);
+            if (!body.name) { alert('Name is required'); return; }
+            const r = await fetch('/api/admin/products', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key },
+                body: JSON.stringify(body)
+            });
+            if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.detail || 'Could not add item'); return; }
+            load();
+        }
+
+        async function saveProduct(id, idPrefix) {
+            const body = readFields(idPrefix, id);
+            const r = await fetch('/api/admin/products', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': key },
+                body: JSON.stringify(body)
+            });
+            if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.detail || 'Could not save changes'); return; }
+            load();
+        }
+
+        async function deleteProduct(id, name) {
+            if (!confirm(`Delete "${name}" permanently? This can't be undone (past orders are unaffected).`)) return;
+            const r = await fetch(`/api/admin/products/${id}`, { method: 'DELETE', headers: { 'X-Admin-Key': key } });
+            if (!r.ok) { alert('Could not delete item'); return; }
+            load();
+        }
+
+        if (key) load();
+    </script>
+</body>
+
+</html>
