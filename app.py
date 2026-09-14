@@ -175,6 +175,7 @@ def init_db():
         ("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 150, 50, "OUT"),
         ("Bhetki Fish Fry", "Crispy Bengali Bhetki fish fry (single serving)", 150, 50, "OUT"),
         ("Luchi + Mutton Curry", "Combo: 4 pcs Luchi, 2 pcs Mutton", 280, 50, "OUT"),
+        ("Luchi + Mutton Ghugni", "Combo: Luchi with Mutton Ghugni", 200, 50, "OUT"),
         ("Mutton Curry (3 Pcs Mutton)", "Rich Bengali mutton curry (3 pcs Mutton)", 300, 50, "OUT"),
         ("Basanti Polao + Mutton Curry", "Combo: Basanti Polao with 2 pcs Mutton", 450, 50, "OUT"),
         ("Veg Chop", "Crispy Kolkata-style vegetable chop (2 pcs)", 100, 50, "OUT"),
@@ -183,6 +184,8 @@ def init_db():
         ("Mixed Fried Rice", "Special mixed fried rice with egg, chicken and prawns", 250, 50, "IN"),
         ("Baked Rasgulla Cups", "Decadent baked rasgulla in a cup (1 pc)", 100, 50, "OUT"),
         ("Chilled Mishti Doi", "Classic Bengali sweet curd, served chilled", 80, 50, "OUT"),
+        ("Makha Sandesh", "Soft, freshly churned Bengali sandesh", 80, 50, "OUT"),
+        ("Mihidana Rabri", "Mihidana soaked in rich, creamy rabri (1 pc)", 100, 50, "OUT"),
     ]
     dates = {
         "Egg Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
@@ -199,14 +202,17 @@ def init_db():
         "Gandhoraj Fish Fry": ["2026-10-16", "2026-10-19", "2026-10-20"],
         "Bhetki Fish Fry": ["2026-10-18"],
         "Luchi + Mutton Curry": ["2026-10-18", "2026-10-20"],
+        "Luchi + Mutton Ghugni": ["2026-10-21"],
         "Mutton Curry (3 Pcs Mutton)": ["2026-10-18", "2026-10-20"],
         "Basanti Polao + Mutton Curry": ["2026-10-18", "2026-10-20"],
         "Veg Chop": ["2026-10-19"],
         "Egg Fried Rice": ["2026-10-19"],
         "Egg Chicken Fried Rice": ["2026-10-19"],
         "Mixed Fried Rice": ["2026-10-19"],
-        "Baked Rasgulla Cups": ["2026-10-19"],
+        "Baked Rasgulla Cups": ["2026-10-19", "2026-10-21"],
         "Chilled Mishti Doi": ["2026-10-19", "2026-10-20"],
+        "Makha Sandesh": ["2026-10-21"],
+        "Mihidana Rabri": ["2026-10-21"],
     }
 
     for name, desc, price, demand, sourcing in products:

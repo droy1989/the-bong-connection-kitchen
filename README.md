@@ -122,3 +122,10 @@ Note: the supplied "REVENUE" values were used as item prices because DEMAND × R
 ## Updated kitchen workflow
 
 Kitchen uses `/admin`: PAID -> START -> PREPARING -> READY -> DELIVERED. The `/display` page auto-refreshes every 3 seconds, announces READY tokens as NOW SERVING, and lists WAITING/PREPARING tokens as GETTING READY. Customers can monitor `/order.html?id=...`.
+
+
+### Added Puja Day — 21 Oct (Dasami)
+- Luchi + Mutton Ghugni — ₹200
+- Baked Rasgulla Cups — ₹100
+- Makha Sandesh — ₹80
+- Mihidana Rabri — ₹100 (1 piece)
