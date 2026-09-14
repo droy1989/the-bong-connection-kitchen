@@ -769,7 +769,7 @@
 
 
         /* =========================================================
-           MENU CARD
+           MENU CARD & IMAGE STYLING
         ========================================================= */
 
         .card {
@@ -844,11 +844,19 @@
 
         .row {
             display: flex;
-
             justify-content: space-between;
             align-items: center;
+            gap: 16px;
+        }
 
-            gap: 18px;
+        .item-thumb {
+            width: 76px;
+            height: 76px;
+            border-radius: 14px;
+            object-fit: cover;
+            border: 1px solid #e2cfae;
+            flex-shrink: 0;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
         }
 
         .item-info {
@@ -998,7 +1006,6 @@
             font-weight: 800;
             line-height: 1.8;
 
-            /* Deep Bengali red */
             color: #8b1111;
 
             text-shadow:
@@ -1015,10 +1022,6 @@
         /* =========================================================
            FOOTER HEART
         ========================================================= */
-
-        /* =========================================================
-   FOOTER HEART
-========================================================= */
 
         .footer-heart {
             display: inline-block;
@@ -1041,24 +1044,6 @@
                 transform: scale(1.18);
                 filter:
                     drop-shadow(0 0 6px rgba(183, 28, 28, .45));
-            }
-        }
-
-        @keyframes footerShimmer {
-
-            0% {
-                background-position: 0% 50%;
-                transform: translateY(0);
-            }
-
-            50% {
-                background-position: 100% 50%;
-                transform: translateY(-2px);
-            }
-
-            100% {
-                background-position: 0% 50%;
-                transform: translateY(0);
             }
         }
 
@@ -1182,89 +1167,10 @@
 
 
         /* =========================================================
-           TABLET
-        ========================================================= */
-
-        @media (max-width: 900px) {
-
-            .banana-decor {
-                width: 125px;
-            }
-
-            .leaf {
-                font-size: 100px;
-                opacity: .48;
-            }
-
-            .banana-left .leaf-1 {
-                left: -28px;
-            }
-
-            .banana-left .leaf-2 {
-                left: -32px;
-            }
-
-            .banana-left .leaf-3 {
-                left: -28px;
-            }
-
-            .banana-right .leaf-1 {
-                right: -28px;
-            }
-
-            .banana-right .leaf-2 {
-                right: -32px;
-            }
-
-            .banana-right .leaf-3 {
-                right: -28px;
-            }
-        }
-
-
-        /* =========================================================
-           MOBILE
+           TABLET & MOBILE RESPONSIVENESS
         ========================================================= */
 
         @media (max-width: 500px) {
-
-            .banana-decor {
-                width: 78px;
-            }
-
-            .leaf {
-                font-size: 70px;
-                opacity: .32;
-            }
-
-            .banana-left .leaf-1 {
-                left: -30px;
-                top: 120px;
-            }
-
-            .banana-left .leaf-2 {
-                left: -34px;
-                top: 430px;
-            }
-
-            .banana-left .leaf-3 {
-                display: none;
-            }
-
-            .banana-right .leaf-1 {
-                right: -30px;
-                top: 150px;
-            }
-
-            .banana-right .leaf-2 {
-                right: -34px;
-                top: 470px;
-            }
-
-            .banana-right .leaf-3 {
-                display: none;
-            }
-
             .wrap {
                 padding-left: 14px;
                 padding-right: 14px;
@@ -1276,120 +1182,9 @@
                 margin-right: -14px;
             }
 
-            .hero h1 {
-                font-size: 29px;
-            }
-
-            .bengali {
-                font-size: 19px;
-            }
-
-            .subtitle {
-                font-size: 13px;
-            }
-
-            .menu-heading {
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .menu-title {
-                display: block;
-                min-width: 0;
-            }
-
-            .menu-heading h2 {
-                font-size: 22px;
-                white-space: nowrap;
-            }
-
-            .menu-title>span {
-                display: block;
-
-                margin-top: 2px;
-
-                font-size: 12px;
-                font-weight: 800;
-            }
-
-            .pdf-btn {
-                padding:
-                    8px 10px;
-
-                font-size: 11px;
-
-                white-space: nowrap;
-            }
-
-            .row {
-                gap: 10px;
-            }
-
-            .item-name {
-                font-size: 16px;
-            }
-
-            .description {
-                font-size: 12px;
-            }
-
-            .price {
-                font-size: 17px;
-            }
-
-            .add-btn {
-                min-width: 82px;
-
-                padding:
-                    11px 13px;
-
-                font-size: 14px;
-            }
-
-            .pay-btn {
-                font-size: 16px;
-
-                padding:
-                    12px 14px;
-            }
-
-            .puja-footer {
-                font-size: 17px;
-            }
-        }
-
-
-        /* =========================================================
-           SMALL MOBILE
-        ========================================================= */
-
-        @media (max-width: 350px) {
-
-            .menu-heading {
-                gap: 7px;
-            }
-
-            .menu-heading h2 {
-                font-size: 20px;
-            }
-
-            .pdf-btn {
-                padding:
-                    7px 8px;
-
-                font-size: 10px;
-            }
-
-            .add-btn {
-                min-width: 74px;
-
-                padding:
-                    10px 9px;
-            }
-
-            .card {
-                padding-left: 18px;
-                padding-right: 13px;
+            .item-thumb {
+                width: 60px;
+                height: 60px;
             }
         }
 
@@ -1428,57 +1223,19 @@
             }
 
             .hero {
-                margin:
-                    0 0 15px;
-
+                margin: 0 0 15px;
                 box-shadow: none;
-
-                border-radius:
-                    0 0 20px 20px;
-
-                -webkit-print-color-adjust:
-                    exact;
-
-                print-color-adjust:
-                    exact;
-            }
-
-            .date-card {
-                box-shadow: none;
-                margin-bottom: 15px;
-            }
-
-            .menu-heading {
-                margin-top: 15px;
-            }
-
-            .menu-title>span {
-                -webkit-text-fill-color: #008f7a !important;
-                color: #008f7a !important;
+                border-radius: 0 0 20px 20px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
 
             .card {
                 break-inside: avoid;
                 page-break-inside: avoid;
-
                 box-shadow: none;
-
                 margin: 8px 0;
-
-                background:
-                    white !important;
-            }
-
-            .puja-footer {
-                margin-top: 20px;
-
-                -webkit-text-fill-color: #008f7a !important;
-                color: #008f7a !important;
-            }
-
-            .footer-heart {
-                -webkit-text-fill-color: #e53935 !important;
-                color: #e53935 !important;
+                background: white !important;
             }
         }
     </style>
@@ -1603,10 +1360,6 @@
 
         <!-- FOOTER -->
 
-        <!-- =====================================================
-     FOOTER
-====================================================== -->
-
         <div class="puja-footer">
 
             🌺
@@ -1671,8 +1424,45 @@
 
     </div>
 
-
     <script>
+
+        /* =====================================================
+           LOCAL IMAGE MAPPING HELPER (HARDENED)
+        ===================================================== */
+        const getImgUrl = (p) => {
+            if (p.image_url && p.image_url.trim() !== '') return p.image_url;
+            if (p.img && p.img.trim() !== '') return p.img;
+
+            const name = (p.name || "").toLowerCase().trim();
+
+            if (name.includes('mixed') && name.includes('rice')) return '/static/images/MixedFriedRice.jpeg';
+            if (name.includes('egg') && name.includes('chicken') && name.includes('rice')) return '/static/images/EggChickenFriedRice.jpeg';
+            if (name.includes('egg') && name.includes('rice')) return '/static/images/EggFriedRice.jpeg';
+            if (name.includes('veg') && name.includes('chop')) return '/static/images/VegChop.jpeg';
+            if (name.includes('makha') && name.includes('sandesh')) return '/static/images/MakhaSandesh.jpeg';
+            if (name.includes('mihidana') && name.includes('rabri')) return '/static/images/MihidanaRabri.jpeg';
+            if (name.includes('baked') && name.includes('rasgulla')) return '/static/images/BakedRasgullacups.jpeg';
+            if (name.includes('mishti') && name.includes('doi')) return '/static/images/ChilledMishtiDoi.jpeg';
+            if (name.includes('luchi') && name.includes('ghugni')) return '/static/images/LuchiMuttonGhugni.jpeg';
+            if (name.includes('mutton') && name.includes('biriyani')) return '/static/images/Mutton-Biriyani.jpeg';
+            if (name.includes('chicken') && name.includes('biriyani')) return '/static/images/Chicken-Biriyani.jpeg';
+            if (name.includes('chicken') && name.includes('egg') && name.includes('roll')) return '/static/images/Chicken-egg-roll.jpg';
+            if (name.includes('mutton') && name.includes('roll')) return '/static/images/Egg-Mutton.jpeg';
+            if (name.includes('egg roll')) return '/static/images/egg-roll.jpg';
+            if (name.includes('chilli chicken')) return '/static/images/Chilli-Chicken.jpeg';
+            if (name.includes('chicken') && (name.includes('chow') || name.includes('chowmein'))) return '/static/images/eggchickenchowmein.jpeg';
+            if (name.includes('egg') && (name.includes('chow') || name.includes('chowmein'))) return '/static/images/Egg-Chowmein.webp';
+            if (name.includes('gandoraj') || name.includes('fish fry')) return '/static/images/Gandoraj-Fish-Fry.jpeg';
+            if (name.includes('singara') || name.includes('samosa')) return '/static/images/Singara.jpeg';
+            if (name.includes('egg') && name.includes('devil')) return '/static/images/Egg-Devil.jpeg';
+            if (name.includes('chicken') && name.includes('cutlet')) return '/static/images/Chicken-Cutlet.jpeg';
+            if (name.includes('basanti') && name.includes('polao')) return '/static/images/BasantiPolaoMC.jpeg';
+            if (name.includes('luchi') && name.includes('mutton')) return '/static/images/LuchiMuttonCurry.jpeg';
+            if (name.includes('mutton') && name.includes('curry')) return '/static/images/Mutton-Curry.jpeg';
+
+            console.warn("No local image mapping for product:", p.name);
+            return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&auto=format&fit=crop&q=80';
+        };
 
         /* =====================================================
            CUSTOMER SESSION LOGIC
@@ -1776,7 +1566,6 @@
             ["2026-10-21", "21 Oct", "Dasami"]
         ];
 
-
         /* =====================================================
            LOAD PAGE
         ===================================================== */
@@ -1791,15 +1580,14 @@
             dateSelect.innerHTML =
                 dates
                     .map(d => `
-                        <option value="${d[0]}">
-                            ${d[1]} — ${d[2]}
-                        </option>
-                    `)
+                <option value="${d[0]}">
+                    ${d[1]} - ${d[2]}
+                </option>
+            `)
                     .join("");
 
             await loadMenu();
         }
-
 
         /* =====================================================
            LOAD MENU
@@ -1828,14 +1616,14 @@
 
             festivalElement.textContent =
                 item
-                    ? `🌺 Today's menu — ${item[2]} 🌺`
+                    ? `🌺 Today's menu — ${item[1]}-${item[2]} 🌺`
                     : "";
 
             menuElement.innerHTML = `
-                <div class="loading">
-                    Preparing today's Bengali feast...
-                </div>
-            `;
+        <div class="loading">
+            Preparing today's Bengali feast...
+        </div>
+    `;
 
             try {
 
@@ -1856,6 +1644,8 @@
                 products =
                     await response.json();
 
+                console.log("Loaded products payload:", products);
+
                 render();
 
             }
@@ -1864,15 +1654,14 @@
                 console.error(error);
 
                 menuElement.innerHTML = `
-                    <div class="loading">
-                        Unable to load the menu.
-                        <br>
-                        Please try again.
-                    </div>
-                `;
+            <div class="loading">
+                Unable to load the menu.
+                <br>
+                Please try again.
+            </div>
+        `;
             }
         }
-
 
         /* =====================================================
            RENDER MENU
@@ -1904,6 +1693,8 @@
                         <div class="card">
 
                             <div class="row">
+
+                                <img src="${getImgUrl(p)}" alt="${escapeHtml(p.name)}" class="item-thumb" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&auto=format&fit=crop&q=80'">
 
                                 <div class="item-info">
 
@@ -2150,7 +1941,6 @@
                     return;
                 }
 
-                // Redirect to Checkout page with order_id
                 location.href =
                     "/static/checkout.html?id=" +
                     order.order_id;
