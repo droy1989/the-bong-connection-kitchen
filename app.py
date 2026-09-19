@@ -59,7 +59,7 @@ def init_db():
     );
     CREATE TABLE IF NOT EXISTS orders(
       id {_PK},
-      token INTEGER UNIQUE NOT NULL,
+      token INTEGER UNIQUE,
       total INTEGER NOT NULL,
       customer_name TEXT DEFAULT '',
       customer_phone TEXT DEFAULT '',
@@ -95,8 +95,12 @@ def init_db():
             "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT ''",
             "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT DEFAULT ''",
             "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_session_id TEXT DEFAULT ''",
+            "ALTER TABLE orders ALTER COLUMN token DROP NOT NULL",
         ]:
-            c.execute(stmt)
+            try:
+                c.execute(stmt)
+            except Exception:
+                pass
         c.commit()
     else:
         for stmt in [
@@ -110,6 +114,37 @@ def init_db():
             except Exception:
                 pass
         c.commit()
+
+        # Migration: ensure token column is nullable in SQLite
+        try:
+            cols = c.execute("PRAGMA table_info(orders)").fetchall()
+            token_col = next((col for col in cols if (col["name"] if isinstance(col, dict) or hasattr(col, "keys") else col[1]) == "token"), None)
+            is_not_null = token_col and ((token_col["notnull"] if isinstance(token_col, dict) or hasattr(token_col, "keys") else token_col[3]) == 1)
+            if is_not_null:
+                c.executescript("""
+                    PRAGMA foreign_keys=off;
+                    CREATE TABLE IF NOT EXISTS orders_migration (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        token INTEGER UNIQUE,
+                        total INTEGER NOT NULL,
+                        customer_name TEXT DEFAULT '',
+                        customer_phone TEXT DEFAULT '',
+                        payment_status TEXT NOT NULL DEFAULT 'PENDING',
+                        order_status TEXT NOT NULL DEFAULT 'WAITING',
+                        utr_number TEXT DEFAULT '',
+                        razorpay_order_id TEXT DEFAULT '',
+                        razorpay_payment_id TEXT DEFAULT '',
+                        created_at TEXT NOT NULL,
+                        customer_session_id TEXT DEFAULT ''
+                    );
+                    INSERT INTO orders_migration SELECT id, token, total, customer_name, customer_phone, payment_status, order_status, utr_number, razorpay_order_id, razorpay_payment_id, created_at, customer_session_id FROM orders;
+                    DROP TABLE orders;
+                    ALTER TABLE orders_migration RENAME TO orders;
+                    PRAGMA foreign_keys=on;
+                """)
+                c.commit()
+        except Exception as e:
+            print("SQLite token migration notice:", e)
 
     # Migration: Rename or merge Egg Noodles -> Egg Chowmein
     noodle_row = c.execute("SELECT id FROM products WHERE name='Egg Noodles'").fetchone()
@@ -395,19 +430,43 @@ def create_order(order: OrderIn, request: Request):
         total += r["price"] * x.quantity
         clean.append((r["id"], r["name"], r["price"], x.quantity))
 
-    token=c.execute("SELECT COALESCE(MAX(token),0)+1 AS next_token FROM orders").fetchone()["next_token"]
     now=datetime.now().isoformat(timespec="seconds")
     c_name = customer["customer_name"]
     c_phone = customer["customer_phone"]
-    insert_sql = """INSERT INTO orders(token,total,customer_name,customer_phone,customer_session_id,payment_status,order_status,created_at)
-           VALUES(?,?,?,?,?,?,?,?)"""
-    insert_params = (token,total,c_name,c_phone,customer["session_id"],"PENDING","WAITING",now)
-    if c.is_postgres:
-        cur = c.execute(insert_sql + " RETURNING id", insert_params)
-        oid = cur.fetchone()["id"]
+    session_id = customer["session_id"]
+
+    # Reuse existing unpaid PENDING order for this session if present
+    existing = c.execute(
+        "SELECT id FROM orders WHERE customer_session_id=? AND payment_status='PENDING' ORDER BY id DESC LIMIT 1",
+        (session_id,)
+    ).fetchone()
+
+    if existing:
+        oid = existing["id"]
+        c.execute(
+            "UPDATE orders SET total=?, customer_name=?, customer_phone=?, created_at=? WHERE id=?",
+            (total, c_name, c_phone, now, oid)
+        )
+        c.execute("DELETE FROM order_items WHERE order_id=?", (oid,))
+        # Clean up any older stale pending orders for this session
+        c.execute(
+            "DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE customer_session_id=? AND payment_status='PENDING' AND id != ?)",
+            (session_id, oid)
+        )
+        c.execute(
+            "DELETE FROM orders WHERE customer_session_id=? AND payment_status='PENDING' AND id != ?",
+            (session_id, oid)
+        )
     else:
-        cur = c.execute(insert_sql, insert_params)
-        oid = cur.lastrowid
+        insert_sql = """INSERT INTO orders(token,total,customer_name,customer_phone,customer_session_id,payment_status,order_status,created_at)
+               VALUES(?,?,?,?,?,?,?,?)"""
+        insert_params = (None,total,c_name,c_phone,session_id,"PENDING","WAITING",now)
+        if c.is_postgres:
+            cur = c.execute(insert_sql + " RETURNING id", insert_params)
+            oid = cur.fetchone()["id"]
+        else:
+            cur = c.execute(insert_sql, insert_params)
+            oid = cur.lastrowid
 
     c.executemany(
         "INSERT INTO order_items(order_id,product_id,name,price,quantity) VALUES(?,?,?,?,?)",
@@ -418,9 +477,24 @@ def create_order(order: OrderIn, request: Request):
 
     return {
         "order_id": oid,
-        "token": token,
+        "token": None,
         "total": total,
     }
+
+def assign_order_token(c, oid: int) -> int:
+    """
+    Atomically ensure that an order has a sequential kitchen queue token assigned.
+    If the order already has a token, return it (idempotent).
+    Otherwise, allocate MAX(token) + 1 and persist it.
+    """
+    row = c.execute("SELECT token FROM orders WHERE id=?", (oid,)).fetchone()
+    if row and row["token"] is not None:
+        return row["token"]
+    next_token = c.execute(
+        "SELECT COALESCE(MAX(token), 0) + 1 AS next_token FROM orders WHERE token IS NOT NULL"
+    ).fetchone()["next_token"]
+    c.execute("UPDATE orders SET token=? WHERE id=?", (next_token, oid))
+    return next_token
 
 @app.post("/api/orders/{oid}/confirm")
 def confirm_payment(oid: int, body: ConfirmIn | None = None):
@@ -430,6 +504,7 @@ def confirm_payment(oid: int, body: ConfirmIn | None = None):
         c.close()
         raise HTTPException(404, "Order not found")
 
+    token = assign_order_token(c, oid)
     utr = body.utr_number.strip() if (body and body.utr_number) else ""
     # Set payment status to PAID, and record utr_number
     c.execute(
@@ -437,7 +512,7 @@ def confirm_payment(oid: int, body: ConfirmIn | None = None):
         (utr, oid)
     )
     c.commit(); c.close()
-    return {"ok": True, "order_id": oid, "token": order["token"], "status":"PAID", "utr_number": utr}
+    return {"ok": True, "order_id": oid, "token": token, "status":"PAID", "utr_number": utr}
 
 @app.post("/api/orders/{oid}/approve-payment")
 def approve_payment(oid: int, x_admin_key: str | None = Header(default=None)):
@@ -448,9 +523,10 @@ def approve_payment(oid: int, x_admin_key: str | None = Header(default=None)):
         c.close()
         raise HTTPException(404, "Order not found")
 
+    token = assign_order_token(c, oid)
     c.execute("UPDATE orders SET payment_status='PAID' WHERE id=?",(oid,))
     c.commit(); c.close()
-    return {"ok": True, "order_id": oid, "token": order["token"], "status":"PAID"}
+    return {"ok": True, "order_id": oid, "token": token, "status":"PAID"}
 
 @app.post("/api/webhooks/phonepe")
 async def phonepe_webhook(request: Request):
@@ -468,6 +544,7 @@ async def phonepe_webhook(request: Request):
             if code == "PAYMENT_SUCCESS" and merchant_trx_id.startswith("FOOD-"):
                 oid = int(merchant_trx_id.replace("FOOD-", ""))
                 c = db()
+                assign_order_token(c, oid)
                 c.execute("UPDATE orders SET payment_status='PAID' WHERE id=?", (oid,))
                 c.commit(); c.close()
                 return {"ok": True, "status": "SUCCESS"}
@@ -742,6 +819,7 @@ def verify_razorpay_payment(body: RazorpayVerifyIn):
         c.close()
         raise HTTPException(404, "Order not found")
 
+    token = assign_order_token(c, body.local_order_id)
     c.execute(
         "UPDATE orders SET payment_status='PAID', razorpay_payment_id=?, razorpay_order_id=? WHERE id=?",
         (body.razorpay_payment_id, body.razorpay_order_id, body.local_order_id)
@@ -751,6 +829,7 @@ def verify_razorpay_payment(body: RazorpayVerifyIn):
     return {
         "ok": True,
         "order_id": body.local_order_id,
+        "token": token,
         "payment_id": body.razorpay_payment_id,
         "status": "PAID",
     }
