@@ -697,6 +697,30 @@ def admin_delete_product(pid: int, x_admin_key: str | None = Header(default=None
     c.commit(); c.close()
     return {"ok": True}
 
+@app.post("/api/admin/reset-orders")
+def admin_reset_orders(x_admin_key: str | None = Header(default=None)):
+    """
+    Clears all orders and order items, and resets both order ID and queue token counters
+    back to 1. Products and customer accounts remain intact.
+    """
+    require_admin(x_admin_key)
+    c = db()
+    c.execute("DELETE FROM order_items")
+    c.execute("DELETE FROM orders")
+    if c.is_postgres:
+        try:
+            c.execute("ALTER SEQUENCE orders_id_seq RESTART WITH 1")
+            c.execute("ALTER SEQUENCE order_items_id_seq RESTART WITH 1")
+        except Exception:
+            pass
+    else:
+        try:
+            c.execute("DELETE FROM sqlite_sequence WHERE name IN ('orders', 'order_items')")
+        except Exception:
+            pass
+    c.commit(); c.close()
+    return {"ok": True, "message": "All orders and queue tokens have been reset to 1"}
+
 
 @app.get("/api/menu-dates")
 def menu_dates():
