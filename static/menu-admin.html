@@ -4,6 +4,9 @@
 <head>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>The Bong Connection — Menu Manager</title>
+    <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
+    <link rel="icon" href="/static/icons/favicon-16.png" sizes="16x16">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
     <style>
         * {
             box-sizing: border-box
@@ -21,6 +24,21 @@
             color: white;
             padding: 16px;
             text-align: center
+        }
+
+        header .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap
+        }
+
+        header .header-logo img {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .4)
         }
 
         header h1 {
@@ -180,7 +198,9 @@
 
 <body>
     <header>
-        <h1>🪔 Menu Manager</h1>
+        <div class="header-logo"><img src="/static/images/bong-connection-logo-sm.png" alt="The Bong Connection logo">
+            <h1>🪔 Menu Manager</h1>
+        </div>
         <div><a href="/admin">← Back to Kitchen Queue</a></div>
     </header>
     <div class="login">

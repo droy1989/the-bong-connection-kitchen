@@ -4,6 +4,9 @@
 <head>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>The Bong Connection — Kitchen</title>
+    <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
+    <link rel="icon" href="/static/icons/favicon-16.png" sizes="16x16">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
     <style>
         * {
             box-sizing: border-box
@@ -21,6 +24,21 @@
             color: white;
             padding: 16px;
             text-align: center
+        }
+
+        header .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap
+        }
+
+        header .header-logo img {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .4)
         }
 
         header h1 {
@@ -145,14 +163,14 @@
 
 <body>
     <header>
-        <h1>🪔 THE BONG CONNECTION</h1>
-        <div>Kitchen Queue</div>
+        <div class="header-logo"><img src="/static/images/bong-connection-logo-sm.png" alt="The Bong Connection logo">
+            <h1>🪔 THE BONG CONNECTION</h1>
+            <div>Kitchen Queue</div>
+        </div>
         <nav><a href="/admin/summary">📋 Order Summary</a><a href="/admin/menu">🍽️ Manage Menu</a></nav>
     </header>
     <div class="login"><input id="key" type="password" placeholder="Admin key">
-        <button class="btn" onclick="login()">Login</button>
-        <button class="btn" style="background:#b71c1c;margin-left:auto" onclick="resetAllOrders()">⚠️ Reset All Orders & Tokens to #1</button>
-        <span id="msg" class="small"></span>
+        <button class="btn" onclick="login()">Login</button> <span id="msg" class="small"></span>
     </div>
     <div class="board">
         <section class="col">
@@ -195,22 +213,6 @@
         async function setStatus(id, s) {
             let r = await fetch(`/api/orders/${id}/status?new_status=${s}`, { method: 'PATCH', headers: { 'X-Admin-Key': key } });
             if (!r.ok) return alert('Could not update order'); load();
-        }
-        async function resetAllOrders() {
-            if (!key) { alert('Please enter and login with your Admin Key first.'); return; }
-            if (!confirm('⚠️ Are you sure you want to clear ALL orders and reset tokens/order numbers back to #1? This cannot be undone.')) return;
-            try {
-                let r = await fetch('/api/admin/reset-orders', { method: 'POST', headers: { 'X-Admin-Key': key } });
-                if (!r.ok) {
-                    let err = await r.json().catch(() => ({}));
-                    return alert(err.detail || 'Failed to reset orders.');
-                }
-                alert('Orders reset successfully! Next order will start at Token #1 and Order #1.');
-                load();
-            } catch (err) {
-                console.error(err);
-                alert('Error resetting orders.');
-            }
         }
         load(); setInterval(load, 3000);
     </script>
