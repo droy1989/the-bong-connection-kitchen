@@ -1,221 +1,676 @@
-<!doctype html>
-<html>
+import os, json, base64, secrets, time, hashlib, hmac
+from dotenv import load_dotenv
+import razorpay
 
-<head>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>The Bong Connection — Kitchen</title>
-    <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
-    <link rel="icon" href="/static/icons/favicon-16.png" sizes="16x16">
-    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-    <style>
-        * {
-            box-sizing: border-box
-        }
+load_dotenv()
 
-        body {
-            font-family: system-ui;
-            margin: 0;
-            background: #f4f4f4;
-            color: #171717
-        }
+from datetime import datetime
+from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-        header {
-            background: #111;
-            color: white;
-            padding: 16px;
-            text-align: center
-        }
+from db import get_db, IS_POSTGRES
 
-        header .header-logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap
-        }
+ADMIN_KEY = os.getenv("ADMIN_KEY", "change-me")
 
-        header .header-logo img {
-            width: 46px;
-            height: 46px;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, .4)
-        }
+# Razorpay Standard Checkout configuration. Secret is server-side only.
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 
-        header h1 {
-            margin: 0
-        }
 
-        header nav {
-            margin-top: 6px;
-            display: flex;
-            gap: 14px;
-            justify-content: center
-        }
+# A customer browser session stores the supplied name and phone number. It is not
+# identity verification; it simply keeps simultaneous customer orders separate.
+AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
+SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 
-        header nav a {
-            color: #9cf;
-            font-size: 13px
-        }
+# Optional PhonePe Business PG credentials
+PHONEPE_MERCHANT_ID = os.getenv("PHONEPE_MERCHANT_ID", "")
+PHONEPE_SALT_KEY = os.getenv("PHONEPE_SALT_KEY", "")
+PHONEPE_SALT_INDEX = os.getenv("PHONEPE_SALT_INDEX", "1")
+PHONEPE_ENV = os.getenv("PHONEPE_ENV", "UAT")
 
-        .login {
-            max-width: 500px;
-            margin: 18px auto;
-            padding: 14px;
-            background: white;
-            border-radius: 12px
-        }
+app = FastAPI(title="Food Stall Queue Ordering")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-        input {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            width: 70%
-        }
+@app.get("/health")
+def health_check():
+return {"status": "healthy", "service": "bong-connection"}
 
-        .btn {
-            border: 0;
-            padding: 11px 14px;
-            border-radius: 9px;
-            background: #111;
-            color: #fff;
-            font-weight: 700;
-            cursor: pointer
-        }
+def db():
+return get_db()
 
-        .board {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-            padding: 16px;
-            max-width: 1400px;
-            margin: auto
-        }
+# id column syntax differs: SQLite uses AUTOINCREMENT, Postgres uses SERIAL.
+_PK = "SERIAL PRIMARY KEY" if IS_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
-        .col {
-            background: #e9e9e9;
-            border-radius: 14px;
-            padding: 12px;
-            min-height: 70vh
-        }
+def init_db():
+c=db()
+c.executescript(f"""
+CREATE TABLE IF NOT EXISTS products(
+id {_PK},
+name TEXT NOT NULL, description TEXT DEFAULT '',
+price INTEGER NOT NULL, demand INTEGER DEFAULT 0,
+sourcing TEXT DEFAULT 'OUT', available INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS menu_dates(
+product_id INTEGER NOT NULL,
+menu_date TEXT NOT NULL,
+PRIMARY KEY(product_id, menu_date)
+);
+CREATE TABLE IF NOT EXISTS orders(
+id {_PK},
+token INTEGER UNIQUE,
+total INTEGER NOT NULL,
+customer_name TEXT DEFAULT '',
+customer_phone TEXT DEFAULT '',
+payment_status TEXT NOT NULL DEFAULT 'PENDING',
+order_status TEXT NOT NULL DEFAULT 'WAITING',
+utr_number TEXT DEFAULT '',
+razorpay_order_id TEXT DEFAULT '',
+razorpay_payment_id TEXT DEFAULT '',
+created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS order_items(
+id {_PK},
+order_id INTEGER NOT NULL, product_id INTEGER NOT NULL,
+name TEXT NOT NULL, price INTEGER NOT NULL, quantity INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS webhook_events(
+event_id TEXT PRIMARY KEY, received_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS customer_sessions(
+session_id TEXT PRIMARY KEY,
+customer_name TEXT NOT NULL,
+customer_phone TEXT NOT NULL,
+expires_at INTEGER NOT NULL,
+created_at TEXT NOT NULL
+);
+""")
+c.commit()
 
-        .col h2 {
-            margin: 5px 0 12px;
-            text-align: center
-        }
+# Add columns if an existing (older) db didn't have them yet.
+if IS_POSTGRES:
+for stmt in [
+"ALTER TABLE orders ADD COLUMN IF NOT EXISTS utr_number TEXT DEFAULT ''",
+"ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT ''",
+"ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT DEFAULT ''",
+"ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_session_id TEXT DEFAULT ''",
+"ALTER TABLE orders ALTER COLUMN token DROP NOT NULL",
+]:
+try:
+c.execute(stmt)
+except Exception:
+pass
+c.commit()
+else:
+for stmt in [
+"ALTER TABLE orders ADD COLUMN utr_number TEXT DEFAULT ''",
+"ALTER TABLE orders ADD COLUMN customer_name TEXT DEFAULT ''",
+"ALTER TABLE orders ADD COLUMN customer_phone TEXT DEFAULT ''",
+"ALTER TABLE orders ADD COLUMN customer_session_id TEXT DEFAULT ''",
+]:
+try:
+c.execute(stmt)
+except Exception:
+pass
+c.commit()
 
-        .order {
-            background: white;
-            border-radius: 12px;
-            padding: 14px;
-            margin: 10px 0;
-            box-shadow: 0 1px 4px #ccc
-        }
+# Migration: ensure token column is nullable in SQLite
+try:
+cols = c.execute("PRAGMA table_info(orders)").fetchall()
+token_col = next((col for col in cols if (col["name"] if isinstance(col, dict) or hasattr(col, "keys") else col[1]) ==
+"token"), None)
+is_not_null = token_col and ((token_col["notnull"] if isinstance(token_col, dict) or hasattr(token_col, "keys") else
+token_col[3]) == 1)
+if is_not_null:
+c.executescript("""
+PRAGMA foreign_keys=off;
+CREATE TABLE IF NOT EXISTS orders_migration (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+token INTEGER UNIQUE,
+total INTEGER NOT NULL,
+customer_name TEXT DEFAULT '',
+customer_phone TEXT DEFAULT '',
+payment_status TEXT NOT NULL DEFAULT 'PENDING',
+order_status TEXT NOT NULL DEFAULT 'WAITING',
+utr_number TEXT DEFAULT '',
+razorpay_order_id TEXT DEFAULT '',
+razorpay_payment_id TEXT DEFAULT '',
+created_at TEXT NOT NULL,
+customer_session_id TEXT DEFAULT ''
+);
+INSERT INTO orders_migration SELECT id, token, total, customer_name, customer_phone, payment_status, order_status,
+utr_number, razorpay_order_id, razorpay_payment_id, created_at, customer_session_id FROM orders;
+DROP TABLE orders;
+ALTER TABLE orders_migration RENAME TO orders;
+PRAGMA foreign_keys=on;
+""")
+c.commit()
+except Exception as e:
+print("SQLite token migration notice:", e)
 
-        .token {
-            font-size: 30px;
-            font-weight: 900
-        }
+# Migration: Rename or merge Egg Noodles -> Egg Chowmein
+noodle_row = c.execute("SELECT id FROM products WHERE name='Egg Noodles'").fetchone()
+chowmein_row = c.execute("SELECT id FROM products WHERE name='Egg Chowmein'").fetchone()
+if noodle_row:
+if chowmein_row:
+existing_dates = [r["menu_date"] for r in c.execute("SELECT menu_date FROM menu_dates WHERE product_id=?",
+(chowmein_row["id"],)).fetchall()]
+for ed in existing_dates:
+c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (noodle_row["id"], ed))
+c.execute("UPDATE menu_dates SET product_id=? WHERE product_id=?", (chowmein_row["id"], noodle_row["id"]))
+try:
+c.execute("UPDATE order_items SET product_id=? WHERE product_id=?", (chowmein_row["id"], noodle_row["id"]))
+except Exception:
+pass
+c.execute("DELETE FROM products WHERE id=?", (noodle_row["id"],))
+else:
+c.execute("UPDATE products SET name='Egg Chowmein', price=130, description='Bengali-style egg chowmein' WHERE id=?",
+(noodle_row["id"],))
 
-        .items {
-            margin: 8px 0
-        }
+# Aliases
+aliases = {
+"Egg-Mutton Roll": ["Egg Mutton Roll"],
+"Gandhoraj Fish Fry": ["Gandhoraj Fish Fry (Single Serving)"],
+"Chilled Mishti Doi": ["Chilled Misto Doi", "Misto Doi", "Mishti Doi"],
+"Luchi + Mutton Curry": ["Luchi + Mutton Curry (4 pcs Luchi, 2 pcs mutton)", "Luchi + Mutton Curry Combo", "Luchi +
+Mutton Curry (4 Pcs Luchi, 2 Pcs Mutton)", "Combo: Luchi + Mutton Curry"],
+"Basanti Polao + Mutton Curry": ["Basanti Polao + Mutton Curry Combo", "Basanti Polao + Mutton Curry(2 peice mutton)",
+"Basanti Polao + Mutton Curry (2 Pcs Mutton)", "Combo: Basanti Polao + Mutton Curry"],
+"Mutton Curry (3 Pcs Mutton)": ["Mutton Curry", "Mutton Curry (3 Pcs)", "Mutton Curry( 3 peice Mutton)", "Mutton Curry
+(3 pcs Mutton)"],
+"Veg Chop": ["Veg Chop (2 pcs)", "Veg Chop (2 peice)", "Veg Chop (2 Pcs)"],
+"Baked Rasgulla Cups": ["Baked Rasgulla Cup", "Baked Rasgulla Cups (1 pc)", "Baked Rasgulla Cups (1 peice)"],
+}
 
-        .total {
-            font-weight: 800;
-            margin: 8px 0
-        }
+for canonical_name, alias_list in aliases.items():
+can_row = c.execute("SELECT id FROM products WHERE name=?", (canonical_name,)).fetchone()
+for alias in alias_list:
+alias_row = c.execute("SELECT id FROM products WHERE name=?", (alias,)).fetchone()
+if alias_row:
+if can_row:
+if alias_row["id"] != can_row["id"]:
+existing_dates = [r["menu_date"] for r in c.execute("SELECT menu_date FROM menu_dates WHERE product_id=?",
+(can_row["id"],)).fetchall()]
+for ed in existing_dates:
+c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (alias_row["id"], ed))
+c.execute("UPDATE menu_dates SET product_id=? WHERE product_id=?", (can_row["id"], alias_row["id"]))
+try:
+c.execute("UPDATE order_items SET product_id=? WHERE product_id=?", (can_row["id"], alias_row["id"]))
+except Exception:
+pass
+c.execute("DELETE FROM products WHERE id=?", (alias_row["id"],))
+else:
+c.execute("UPDATE products SET name=? WHERE id=?", (canonical_name, alias_row["id"]))
+can_row = alias_row
 
-        .btn.start {
-            background: #155eef
-        }
+products = [
+("Egg Roll", "Bengali-style egg roll", 79, 30, "IN"),
+("Egg-Chicken Roll", "Egg and chicken roll", 120, 40, "IN"),
+("Egg-Mutton Roll", "Egg and mutton roll", 175, 30, "IN"),
+("Chilli Chicken / Manchurian", "Chilli chicken / Manchurian", 180, 50, "IN"),
+("Egg Chowmein", "Bengali-style egg chowmein", 130, 50, "IN"),
+("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 150, 50, "IN"),
+("Mutton Biriyani", "Mutton biriyani", 450, 50, "OUT"),
+("Chicken Biriyani", "Chicken biriyani", 300, 50, "OUT"),
+("Singara", "Crispy Bengali singara", 80, 50, "OUT"),
+("Egg Devil", "Bengali egg devil", 120, 50, "OUT"),
+("Chicken Cutlet", "Crispy Bengali chicken cutlet", 150, 50, "OUT"),
+("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 150, 50, "OUT"),
+("Bhetki Fish Fry", "Crispy Bengali Bhetki fish fry (single serving)", 150, 50, "OUT"),
+("Luchi + Mutton Curry", "Combo: 4 pcs Luchi, 2 pcs Mutton", 280, 50, "OUT"),
+("Luchi + Mutton Ghugni", "Combo: Luchi with Mutton Ghugni", 200, 50, "OUT"),
+("Mutton Curry (3 Pcs Mutton)", "Rich Bengali mutton curry (3 pcs Mutton)", 300, 50, "OUT"),
+("Basanti Polao + Mutton Curry", "Combo: Basanti Polao with 2 pcs Mutton", 450, 50, "OUT"),
+("Veg Chop", "Crispy Kolkata-style vegetable chop (2 pcs)", 100, 50, "OUT"),
+("Egg Fried Rice", "Kolkata-style egg fried rice", 150, 50, "IN"),
+("Egg Chicken Fried Rice", "Kolkata-style egg chicken fried rice", 175, 50, "IN"),
+("Mixed Fried Rice", "Special mixed fried rice with egg, chicken and prawns", 250, 50, "IN"),
+("Baked Rasgulla Cups", "Decadent baked rasgulla in a cup (1 pc)", 100, 50, "OUT"),
+("Chilled Mishti Doi", "Classic Bengali sweet curd, served chilled", 80, 50, "OUT"),
+("Makha Sandesh", "Soft, freshly churned Bengali sandesh", 80, 50, "OUT"),
+("Mihidana Rabri", "Mihidana soaked in rich, creamy rabri (1 pc)", 100, 50, "OUT"),
+]
+dates = {
+"Egg Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Egg-Chicken Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Egg-Mutton Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Chilli Chicken / Manchurian": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Egg Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Egg Chicken Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Mutton Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Chicken Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Singara": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+"Egg Devil": ["2026-10-17", "2026-10-19"],
+"Chicken Cutlet": ["2026-10-17", "2026-10-20"],
+"Gandhoraj Fish Fry": ["2026-10-16", "2026-10-19", "2026-10-20"],
+"Bhetki Fish Fry": ["2026-10-18"],
+"Luchi + Mutton Curry": ["2026-10-18", "2026-10-20"],
+"Luchi + Mutton Ghugni": ["2026-10-21"],
+"Mutton Curry (3 Pcs Mutton)": ["2026-10-18", "2026-10-20"],
+"Basanti Polao + Mutton Curry": ["2026-10-18", "2026-10-20"],
+"Veg Chop": ["2026-10-19"],
+"Egg Fried Rice": ["2026-10-19"],
+"Egg Chicken Fried Rice": ["2026-10-19"],
+"Mixed Fried Rice": ["2026-10-19"],
+"Baked Rasgulla Cups": ["2026-10-19", "2026-10-21"],
+"Chilled Mishti Doi": ["2026-10-19", "2026-10-20"],
+"Makha Sandesh": ["2026-10-21"],
+"Mihidana Rabri": ["2026-10-21"],
+}
 
-        .btn.ready {
-            background: #16833b
-        }
+for name, desc, price, demand, sourcing in products:
+row = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()
+if row:
+c.execute(
+"UPDATE products SET price=?, description=?, demand=?, sourcing=?, available=1 WHERE id=?",
+(price, desc, demand, sourcing, row["id"])
+)
+pid = row["id"]
+else:
+c.execute(
+"INSERT INTO products(name, description, price, demand, sourcing, available) VALUES(?,?,?,?,?,1)",
+(name, desc, price, demand, sourcing)
+)
+pid = c.execute("SELECT id FROM products WHERE name=?", (name,)).fetchone()["id"]
 
-        .btn.deliver {
-            background: #555;
-            width: 100%
-        }
+target_dates = set(dates.get(name, []))
+current_dates = [r["menu_date"] for r in c.execute("SELECT menu_date FROM menu_dates WHERE product_id=?",
+(pid,)).fetchall()]
+for cd in current_dates:
+if cd not in target_dates:
+c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (pid, cd))
 
-        .empty {
-            text-align: center;
-            color: #777;
-            padding: 25px
-        }
+for d in target_dates:
+exists = c.execute(
+"SELECT 1 FROM menu_dates WHERE product_id=? AND menu_date=?",
+(pid, d)
+).fetchone()
+if not exists:
+c.execute(
+"INSERT INTO menu_dates(product_id, menu_date) VALUES(?,?)",
+(pid, d)
+)
+c.commit(); c.close()
 
-        .small {
-            font-size: 12px;
-            color: #777
-        }
+init_db()
 
-        @media(max-width:800px) {
-            .board {
-                grid-template-columns: 1fr
-            }
+class Item(BaseModel):
+product_id: int
+quantity: int
 
-            .col {
-                min-height: auto
-            }
-        }
-    </style>
-</head>
+class OrderIn(BaseModel):
+items: list[Item]
+menu_date: str
+customer_name: str | None = ""
+customer_phone: str | None = ""
 
-<body>
-    <header>
-        <div class="header-logo"><img src="/static/images/bong-connection-logo-sm.png" alt="The Bong Connection logo">
-            <h1>🪔 THE BONG CONNECTION</h1>
-            <div>Kitchen Queue</div>
-        </div>
-        <nav><a href="/admin/summary">📋 Order Summary</a><a href="/admin/menu">🍽️ Manage Menu</a></nav>
-    </header>
-    <div class="login"><input id="key" type="password" placeholder="Admin key">
-        <button class="btn" onclick="login()">Login</button> <span id="msg" class="small"></span>
-    </div>
-    <div class="board">
-        <section class="col">
-            <h2>💳 PAID</h2>
-            <div id="paid"></div>
-        </section>
-        <section class="col">
-            <h2>👨‍🍳 PREPARING</h2>
-            <div id="preparing"></div>
-        </section>
-        <section class="col">
-            <h2>📦 READY</h2>
-            <div id="ready"></div>
-        </section>
-    </div>
-    <script>
-        let key = localStorage.getItem('adminKey') || ''; document.getElementById('key').value = key;
-        function login() { key = document.getElementById('key').value; localStorage.setItem('adminKey', key); load() }
-        function card(o) {
-            let items = o.items.map(x => `${x.quantity} × ${x.name}`).join('<br>'), action = '';
-            let utrHtml = o.utr_number ? `<div class="small" style="color:#0066cc;font-weight:bold;margin:4px 0;">UTR: ${o.utr_number}</div>` : '';
-            let custHtml = (o.customer_name || o.customer_phone) ? `<div style="font-size:13px;font-weight:bold;color:#b71c1c;margin:4px 0;">👤 ${o.customer_name || 'Customer'} (${o.customer_phone || 'No phone'})</div>` : '';
-            if (o.order_status === 'WAITING') action = `<button class="btn start" onclick="setStatus(${o.id},'PREPARING')">Start Preparing</button>`;
-            if (o.order_status === 'PREPARING') action = `<button class="btn ready" onclick="setStatus(${o.id},'READY')">Mark as Ready</button>`;
-            if (o.order_status === 'READY') action = `<button class="btn deliver" onclick="setStatus(${o.id},'DELIVERED')">Mark as Delivered</button>`;
-            return `<div class="order"><div class="token">#${o.token}</div>${custHtml}<div class="items">${items}</div><div class="total">₹${o.total}</div>${utrHtml}${action}</div>`;
-        }
-        function draw(id, arr) { document.getElementById(id).innerHTML = arr.length ? arr.map(card).join('') : '<div class="empty">No orders</div>' }
-        async function load() {
-            if (!key) { msg.textContent = 'Enter admin key'; return }
-            let r = await fetch('/api/orders', { headers: { 'X-Admin-Key': key } });
-            if (!r.ok) { msg.textContent = 'Invalid admin key'; return }
-            msg.textContent = 'Auto-refresh: 3 sec';
-            let os = await r.json();
-            let active = os.filter(o => o.order_status !== 'DELIVERED');
-            draw('paid', active.filter(o => o.order_status === 'WAITING'));
-            draw('preparing', active.filter(o => o.order_status === 'PREPARING'));
-            draw('ready', active.filter(o => o.order_status === 'READY'));
-        }
-        async function setStatus(id, s) {
-            let r = await fetch(`/api/orders/${id}/status?new_status=${s}`, { method: 'PATCH', headers: { 'X-Admin-Key': key } });
-            if (!r.ok) return alert('Could not update order'); load();
-        }
-        load(); setInterval(load, 3000);
-    </script>
-</body>
+class ConfirmIn(BaseModel):
+utr_number: str | None = ""
 
-</html>
+class RazorpayOrderIn(BaseModel):
+order_id: int # our local DB order id
+
+class RazorpayVerifyIn(BaseModel):
+razorpay_payment_id: str
+razorpay_order_id: str
+razorpay_signature: str
+local_order_id: int # our local DB order id
+
+class CustomerSessionIn(BaseModel):
+name: str
+phone: str
+
+def normalized_phone(phone: str) -> str:
+phone = phone.strip()
+if len(phone) != 10 or not phone.isdigit():
+raise HTTPException(400, "Enter a valid 10-digit Indian mobile number")
+return phone
+
+def current_customer(request: Request) -> dict:
+session_id = request.cookies.get("customer_session")
+if not session_id:
+raise HTTPException(401, "Please enter your name and mobile number before placing an order")
+c = db()
+customer = c.execute("SELECT * FROM customer_sessions WHERE session_id=?", (session_id,)).fetchone()
+if not customer or customer["expires_at"] < int(time.time()): if customer: c.execute("DELETE FROM customer_sessions
+    WHERE session_id=?", (session_id,)); c.commit() c.close() raise
+    HTTPException(401, "Please enter your name and mobile number before placing an order" ) c.close() return
+    dict(customer) @app.post("/api/customer-session") def start_customer_session(body: CustomerSessionIn):
+    name=body.name.strip() phone=normalized_phone(body.phone) if not name or len(name)> 100:
+    raise HTTPException(400, "Enter a valid name")
+    session_id = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + SESSION_TTL_SECONDS
+    c = db()
+    c.execute("INSERT INTO customer_sessions(session_id,customer_name,customer_phone,expires_at,created_at)
+    VALUES(?,?,?,?,?)",
+    (session_id, name, phone, expires_at, datetime.now().isoformat(timespec="seconds")))
+    c.commit(); c.close()
+    response = JSONResponse(
+    {"ok": True, "name": name, "phone": phone}
+    )
+    response.set_cookie("customer_session", session_id, max_age=SESSION_TTL_SECONDS,
+    httponly=True, secure=AUTH_COOKIE_SECURE, samesite="lax", path="/")
+    return response
+
+    @app.get("/api/customer-session")
+    def customer_session(request: Request):
+    customer = current_customer(request)
+    return {"ok": True, "name": customer["customer_name"], "phone": customer["customer_phone"]}
+
+    def require_admin(key):
+    if key != ADMIN_KEY:
+    raise HTTPException(401, "Invalid admin key")
+
+    @app.get("/")
+    def home():
+    return FileResponse("static/menu.html")
+
+    @app.get("/checkout")
+    def checkout_page():
+    return FileResponse("static/checkout.html")
+
+    @app.get("/admin")
+    def admin():
+    return FileResponse("static/admin.html")
+
+    @app.get("/admin/summary")
+    def admin_summary():
+    return FileResponse("static/kitchen-summary.html")
+
+    @app.get("/admin/menu")
+    def admin_menu():
+    return FileResponse("static/menu-admin.html")
+
+    @app.get("/display")
+    def display():
+    return FileResponse("static/display.html")
+
+    @app.get("/api/config")
+    def config():
+    return {
+    "razorpay_key_id": RAZORPAY_KEY_ID,
+    }
+
+    @app.get("/api/products")
+    def products(menu_date: str | None = None):
+    c=db()
+    if menu_date:
+    rows=c.execute(
+    """SELECT p.* FROM products p
+    JOIN menu_dates m ON m.product_id=p.id
+    WHERE m.menu_date=? AND p.available=1
+    ORDER BY p.id""",(menu_date,)
+    ).fetchall()
+    else:
+    rows=c.execute("SELECT * FROM products WHERE available=1 ORDER BY id").fetchall()
+    c.close()
+    return [dict(r) for r in rows]
+
+    @app.post("/api/orders")
+    def create_order(order: OrderIn, request: Request):
+    customer = current_customer(request)
+    if not order.items:
+    raise HTTPException(400, "Cart is empty")
+
+    c=db()
+    ids=[x.product_id for x in order.items]
+    marks=",".join("?" for _ in ids)
+    rows=c.execute(
+    f"""SELECT p.* FROM products p
+    JOIN menu_dates m ON m.product_id=p.id
+    WHERE p.id IN ({marks}) AND p.available=1 AND m.menu_date=?""",
+    ids+[order.menu_date]
+    ).fetchall()
+    by_id={r["id"]:r for r in rows}
+
+    total=0
+    clean=[]
+    for x in order.items:
+    if x.quantity < 1 or x.product_id not in by_id: raise HTTPException(400, "Invalid or unavailable item" )
+        r=by_id[x.product_id] total +=r["price"] * x.quantity clean.append((r["id"], r["name"], r["price"], x.quantity))
+        now=datetime.now().isoformat(timespec="seconds" ) c_name=customer["customer_name"]
+        c_phone=customer["customer_phone"] session_id=customer["session_id"] # Reuse existing unpaid PENDING order for
+        this session if present
+        existing=c.execute( "SELECT id FROM orders WHERE customer_session_id=? AND payment_status='PENDING' ORDER BY id DESC LIMIT 1"
+        , (session_id,) ).fetchone() if existing: oid=existing["id"]
+        c.execute( "UPDATE orders SET total=?, customer_name=?, customer_phone=?, created_at=? WHERE id=?" , (total,
+        c_name, c_phone, now, oid) ) c.execute("DELETE FROM order_items WHERE order_id=?", (oid,)) # Clean up any older
+        stale pending orders for this session
+        c.execute( "DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE customer_session_id=? AND payment_status='PENDING' AND id != ?)"
+        , (session_id, oid) )
+        c.execute( "DELETE FROM orders WHERE customer_session_id=? AND payment_status='PENDING' AND id != ?" ,
+        (session_id, oid) ) else: insert_sql="""INSERT INTO orders(token,total,customer_name,customer_phone,customer_session_id,payment_status,order_status,created_at)
+               VALUES(?,?,?,?,?,?,?,?)""" insert_params=(None,total,c_name,c_phone,session_id,"PENDING","WAITING",now)
+        if c.is_postgres: cur=c.execute(insert_sql + " RETURNING id" , insert_params) oid=cur.fetchone()["id"] else:
+        cur=c.execute(insert_sql, insert_params) oid=cur.lastrowid
+        c.executemany( "INSERT INTO order_items(order_id,product_id,name,price,quantity) VALUES(?,?,?,?,?)" , [(oid,*x)
+        for x in clean] ) c.commit(); c.close() return { "order_id" : oid, "token" : None, "total" : total, } def
+        assign_order_token(c, oid: int) -> int:
+        """
+        Atomically ensure that an order has a sequential kitchen queue token assigned.
+        If the order already has a token, return it (idempotent).
+        Otherwise, allocate MAX(token) + 1 and persist it.
+        """
+        row = c.execute("SELECT token FROM orders WHERE id=?", (oid,)).fetchone()
+        if row and row["token"] is not None:
+        return row["token"]
+        next_token = c.execute(
+        "SELECT COALESCE(MAX(token), 0) + 1 AS next_token FROM orders WHERE token IS NOT NULL"
+        ).fetchone()["next_token"]
+        c.execute("UPDATE orders SET token=? WHERE id=?", (next_token, oid))
+        return next_token
+
+        @app.post("/api/orders/{oid}/confirm")
+        def confirm_payment(oid: int, body: ConfirmIn | None = None):
+        c=db()
+        order=c.execute("SELECT * FROM orders WHERE id=?",(oid,)).fetchone()
+        if not order:
+        c.close()
+        raise HTTPException(404, "Order not found")
+
+        token = assign_order_token(c, oid)
+        utr = body.utr_number.strip() if (body and body.utr_number) else ""
+        # Set payment status to PAID, and record utr_number
+        c.execute(
+        "UPDATE orders SET payment_status='PAID', utr_number=? WHERE id=?",
+        (utr, oid)
+        )
+        c.commit(); c.close()
+        return {"ok": True, "order_id": oid, "token": token, "status":"PAID", "utr_number": utr}
+
+        @app.post("/api/orders/{oid}/approve-payment")
+        def approve_payment(oid: int, x_admin_key: str | None = Header(default=None)):
+        require_admin(x_admin_key)
+        c=db()
+        order=c.execute("SELECT * FROM orders WHERE id=?",(oid,)).fetchone()
+        if not order:
+        c.close()
+        raise HTTPException(404, "Order not found")
+
+        token = assign_order_token(c, oid)
+        c.execute("UPDATE orders SET payment_status='PAID' WHERE id=?",(oid,))
+        c.commit(); c.close()
+        return {"ok": True, "order_id": oid, "token": token, "status":"PAID"}
+
+        @app.post("/api/webhooks/phonepe")
+        async def phonepe_webhook(request: Request):
+        """Automated server webhook listener for PhonePe Business PG payments."""
+        try:
+        body = await request.json()
+        response_b64 = body.get("response", "")
+        if response_b64:
+        decoded = json.loads(base64.b64decode(response_b64).decode("utf-8"))
+        data = decoded.get("data", {})
+        code = decoded.get("code", "")
+        merchant_trx_id = data.get("merchantTransactionId", "")
+
+        # If PhonePe transaction succeeded (code == PAYMENT_SUCCESS)
+        if code == "PAYMENT_SUCCESS" and merchant_trx_id.startswith("FOOD-"):
+        oid = int(merchant_trx_id.replace("FOOD-", ""))
+        c = db()
+        assign_order_token(c, oid)
+        c.execute("UPDATE orders SET payment_status='PAID' WHERE id=?", (oid,))
+        c.commit(); c.close()
+        return {"ok": True, "status": "SUCCESS"}
+        except Exception as e:
+        print("PhonePe Webhook Error:", e)
+        return {"ok": True}
+
+        @app.get("/api/orders/{oid}")
+        def get_order(oid:int):
+        c=db()
+        r=c.execute("SELECT * FROM orders WHERE id=?",(oid,)).fetchone()
+        if not r:
+        c.close()
+        raise HTTPException(404,"Order not found")
+        items=c.execute(
+        "SELECT name,price,quantity FROM order_items WHERE order_id=?",(oid,)
+        ).fetchall()
+        c.close()
+        return {**dict(r),"items":[dict(x) for x in items]}
+
+        @app.get("/api/orders")
+        def all_orders(x_admin_key: str | None = Header(default=None)):
+        require_admin(x_admin_key)
+        c=db()
+        rows=c.execute(
+        "SELECT * FROM orders WHERE payment_status='PAID' ORDER BY token"
+        ).fetchall()
+        out=[]
+        for r in rows:
+        items=c.execute(
+        "SELECT name,price,quantity FROM order_items WHERE order_id=?",(r["id"],)
+        ).fetchall()
+        out.append({**dict(r),"items":[dict(x) for x in items]})
+        c.close()
+        return out
+
+        @app.patch("/api/orders/{oid}/status")
+        def update_status(oid:int,new_status:str,x_admin_key: str | None = Header(default=None)):
+        require_admin(x_admin_key)
+        if new_status not in {"WAITING","PREPARING","READY","DELIVERED"}:
+        raise HTTPException(400,"Invalid status")
+        c=db()
+        c.execute("UPDATE orders SET order_status=? WHERE id=?",(new_status,oid))
+        c.commit(); c.close()
+        return {"ok":True}
+
+
+        class ProductIn(BaseModel):
+        id: int | None = None
+        name: str
+        description: str | None = ""
+        price: int
+        demand: int | None = 50
+        sourcing: str | None = "OUT"
+        available: bool | None = True
+        dates: list[str]
+
+        @app.get("/api/admin/products")
+        def admin_list_products(x_admin_key: str | None = Header(default=None)):
+        """
+        Full menu (including sold-out/unavailable items), each with its exact
+        list of menu dates attached — used by the menu management screen.
+        """
+        require_admin(x_admin_key)
+        c = db()
+        rows = c.execute("SELECT * FROM products ORDER BY id").fetchall()
+        out = []
+        for r in rows:
+        d = c.execute(
+        "SELECT menu_date FROM menu_dates WHERE product_id=? ORDER BY menu_date",
+        (r["id"],)
+        ).fetchall()
+        out.append({**dict(r), "dates": [x["menu_date"] for x in d]})
+        c.close()
+        return out
+
+        @app.post("/api/admin/products")
+        def admin_upsert_product(body: ProductIn, x_admin_key: str | None = Header(default=None)):
+        """
+        Create a new menu item, or update an existing one (matched by id if given,
+        otherwise by name). 'dates' is the COMPLETE list of dates this item should
+        appear on — any date not included gets removed, any new date gets added.
+        No redeploy needed: this writes straight to the live database.
+        """
+        require_admin(x_admin_key)
+        name = body.name.strip()
+        if not name:
+        raise HTTPException(400, "Name is required")
+        if body.price < 0: raise HTTPException(400, "Price cannot be negative" ) c=db() row=None if body.id is not None:
+            row=c.execute("SELECT id FROM products WHERE id=?", (body.id,)).fetchone() if not row: c.close() raise
+            HTTPException(404, "Product not found" ) else: row=c.execute("SELECT id FROM products WHERE name=?",
+            (name,)).fetchone() available_val=1 if body.available else 0 if row: pid=row["id"]
+            c.execute( "UPDATE products SET name=?, description=?, price=?, demand=?, sourcing=?, available=? WHERE id=?"
+            , (name, body.description or "" , body.price, body.demand or 0, body.sourcing or "OUT" , available_val, pid)
+            ) else: insert_sql="""INSERT INTO products(name, description, price, demand, sourcing, available)
+                         VALUES(?,?,?,?,?,?)""" insert_params=(name, body.description or "" , body.price, body.demand
+            or 0, body.sourcing or "OUT" , available_val) if c.is_postgres: cur=c.execute(insert_sql + " RETURNING id" ,
+            insert_params) pid=cur.fetchone()["id"] else: cur=c.execute(insert_sql, insert_params) pid=cur.lastrowid
+            target_dates=set(d.strip() for d in body.dates if d.strip()) current_dates={r["menu_date"] for r in
+            c.execute( "SELECT menu_date FROM menu_dates WHERE product_id=?" , (pid,) ).fetchall()} for cd in
+            current_dates - target_dates: c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date=?", (pid,
+            cd)) for d in target_dates - current_dates: c.execute("INSERT INTO menu_dates(product_id, menu_date)
+            VALUES(?,?)", (pid, d)) c.commit() result=dict(c.execute("SELECT * FROM products WHERE id=?",
+            (pid,)).fetchone()) result["dates"]=sorted(target_dates) c.close() return result
+            @app.delete("/api/admin/products/{pid}") def admin_delete_product(pid: int, x_admin_key: str |
+            None=Header(default=None)): """
+    Permanently removes a menu item and its date associations. Safe to do even
+    after it's been ordered before — past orders keep their own copy of the
+    item's name/price in order_items, so order history is unaffected.
+    """ require_admin(x_admin_key) c=db() row=c.execute("SELECT id FROM products WHERE id=?", (pid,)).fetchone() if not
+            row: c.close() raise HTTPException(404, "Product not found" ) c.execute("DELETE FROM menu_dates WHERE
+            product_id=?", (pid,)) c.execute("DELETE FROM products WHERE id=?", (pid,)) c.commit(); c.close() return
+            {"ok": True} @app.post("/api/admin/reset-orders") def admin_reset_orders(x_admin_key: str |
+            None=Header(default=None)): """
+    Clears all orders and order items, and resets both order ID and queue token counters
+    back to 1. Products and customer accounts remain intact.
+    """ require_admin(x_admin_key) c=db() c.execute("DELETE FROM order_items") c.execute("DELETE FROM orders") if
+            c.is_postgres: try: c.execute("ALTER SEQUENCE orders_id_seq RESTART WITH 1") c.execute("ALTER SEQUENCE
+            order_items_id_seq RESTART WITH 1") except Exception: pass else: try: c.execute("DELETE FROM sqlite_sequence
+            WHERE name IN ('orders', 'order_items' )") except Exception: pass c.commit(); c.close() return {"ok":
+            True, "message" : "All orders and queue tokens have been reset to 1" } @app.get("/api/menu-dates") def
+            menu_dates(): c=db() rows=c.execute("SELECT DISTINCT menu_date FROM menu_dates ORDER BY
+            menu_date").fetchall() c.close() return [r["menu_date"] for r in rows] @app.get("/api/menu-plan") def
+            menu_plan(): c=db() agg="STRING_AGG(m.menu_date, ',')" if c.is_postgres else "GROUP_CONCAT(m.menu_date)"
+            rows=c.execute( f"""SELECT p.id,p.name,p.price,p.demand,p.sourcing, {agg} AS dates FROM products p JOIN
+            menu_dates m ON m.product_id=p.id GROUP BY p.id ORDER BY p.id""" ).fetchall() c.close() return [dict(r) for
+            r in rows] @app.get("/api/display") def public_display(): c=db() ready=c.execute( """SELECT token FROM orders
+           WHERE payment_status='PAID' AND order_status='READY'
+           ORDER BY token LIMIT 1""" ).fetchone() pending=c.execute( """SELECT token FROM orders
+           WHERE payment_status='PAID' AND order_status IN ('WAITING','PREPARING')
+           ORDER BY token LIMIT 8""" ).fetchall() c.close() return { "now_serving" : ready["token"] if ready else
+            None, "queue" :[x["token"] for x in pending] } #
+            ──────────────────────────────────────────────────────────── # Razorpay Standard Checkout endpoints #
+            ──────────────────────────────────────────────────────────── @app.post("/api/create-razorpay-order") def
+            create_razorpay_order(body:
+            RazorpayOrderIn): """Create a Razorpay order for an existing local order and return the Razorpay order_id."""
+            if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET: raise
+            HTTPException(500, "Razorpay is not configured on the server" ) c=db() order=c.execute("SELECT * FROM orders
+            WHERE id=?", (body.order_id,)).fetchone() c.close() if not order: raise HTTPException(404, "Order not found"
+            ) if order["payment_status"]=="PAID" : raise HTTPException(400, "Order is already paid" )
+            amount_paise=order["total"] * 100 # Razorpay amount is in paise if amount_paise < 100: raise
+            HTTPException(400, "Amount must be at least ₹1 (100 paise)" ) try:
+            client=razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) rzp_order=client.order.create({ "amount"
+            : amount_paise, "currency" : "INR" , "receipt" : f"FOOD-{body.order_id}", "payment_capture" : 1, }) except
+            Exception as e: raise HTTPException(500, f"Razorpay order creation failed: {e}") # Persist the Razorpay
+            order_id against our local order c=db() c.execute( "UPDATE orders SET razorpay_order_id=? WHERE id=?" ,
+            (rzp_order["id"], body.order_id) ) c.commit(); c.close() return { "razorpay_order_id" :
+            rzp_order["id"], "amount" : amount_paise, "currency" : "INR" , "key_id" : RAZORPAY_KEY_ID, }
+            @app.post("/api/verify-payment") def verify_razorpay_payment(body:
+            RazorpayVerifyIn): """Verify Razorpay's checkout signature and mark the local order PAID.""" if not
+            RAZORPAY_KEY_SECRET: raise HTTPException(500, "Razorpay is not configured on the server" ) required=[
+            body.razorpay_payment_id.strip(), body.razorpay_order_id.strip(), body.razorpay_signature.strip() ] if not
+            all(required): raise HTTPException(400, "Missing Razorpay payment fields" ) # HMAC-SHA256 verification
+            payload=f"{body.razorpay_order_id}|{body.razorpay_payment_id}" expected=hmac.new(
+            RAZORPAY_KEY_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256 ).hexdigest() if not
+            hmac.compare_digest(expected, body.razorpay_signature): raise
+            HTTPException(400, "Payment signature mismatch — possible tampering" ) # Signature valid: mark order as PAID
+            and store Razorpay IDs c=db() order=c.execute("SELECT * FROM orders WHERE id=?",
+            (body.local_order_id,)).fetchone() if not order: c.close() raise HTTPException(404, "Order not found" )
+            token=assign_order_token(c, body.local_order_id)
+            c.execute( "UPDATE orders SET payment_status='PAID', razorpay_payment_id=?, razorpay_order_id=? WHERE id=?"
+            , (body.razorpay_payment_id, body.razorpay_order_id, body.local_order_id) ) c.commit(); c.close() return
+            { "ok" : True, "order_id" : body.local_order_id, "token" : token, "payment_id" :
+            body.razorpay_payment_id, "status" : "PAID" , }
