@@ -1643,6 +1643,7 @@
 
             const name = (p.name || "").toLowerCase().trim();
 
+            if (name.includes('chap') || name.includes('chaap')) return '/static/images/chickenchap.jpeg';
             if (name.includes('mixed') && name.includes('rice')) return '/static/images/MixedFriedRice.jpeg';
             if (name.includes('egg') && name.includes('chicken') && name.includes('rice')) return '/static/images/EggChickenFriedRice.jpeg';
             if (name.includes('egg') && name.includes('rice')) return '/static/images/EggFriedRice.jpeg';
@@ -1650,7 +1651,7 @@
             if (name.includes('makha') && name.includes('sandesh')) return '/static/images/MakhaSandesh.jpeg';
             if (name.includes('mihidana') && name.includes('rabri')) return '/static/images/MihidanaRabri.jpeg';
             if (name.includes('baked') && name.includes('rasgulla')) return '/static/images/BakedRasgullacups.jpeg';
-            if (name.includes('mishti') && name.includes('doi')) return '/static/images/ChilledMishtiDoi.jpeg';
+            if ((name.includes('mishti') || name.includes('misti')) && name.includes('doi')) return '/static/images/ChilledMishtiDoi.jpeg';
             if (name.includes('luchi') && name.includes('ghugni')) return '/static/images/LuchiMuttonGhugni.jpeg';
             if (name.includes('mutton') && name.includes('biriyani')) return '/static/images/Mutton-Biriyani.jpeg';
             if (name.includes('chicken') && name.includes('biriyani')) return '/static/images/Chicken-Biriyani.jpeg';

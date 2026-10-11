@@ -167,12 +167,13 @@ def init_db():
     aliases = {
         "Egg-Mutton Roll": ["Egg Mutton Roll"],
         "Gandhoraj Fish Fry": ["Gandhoraj Fish Fry (Single Serving)"],
-        "Chilled Mishti Doi": ["Chilled Misto Doi", "Misto Doi", "Mishti Doi"],
+        "Chilled Mishti Doi": ["Chilled Misto Doi", "Misto Doi", "Mishti Doi", "Chilled Misti Doi", "Chilled Misti doi", "Misti Doi", "Misti doi"],
         "Luchi + Mutton Curry": ["Luchi + Mutton Curry (4 pcs Luchi, 2 pcs mutton)", "Luchi + Mutton Curry Combo", "Luchi + Mutton Curry (4 Pcs Luchi, 2 Pcs Mutton)", "Combo: Luchi + Mutton Curry"],
         "Basanti Polao + Mutton Curry": ["Basanti Polao + Mutton Curry Combo", "Basanti Polao + Mutton Curry(2 peice mutton)", "Basanti Polao + Mutton Curry (2 Pcs Mutton)", "Combo: Basanti Polao + Mutton Curry"],
         "Mutton Curry (3 Pcs Mutton)": ["Mutton Curry", "Mutton Curry (3 Pcs)", "Mutton Curry( 3 peice Mutton)", "Mutton Curry (3 pcs Mutton)"],
         "Veg Chop": ["Veg Chop (2 pcs)", "Veg Chop (2 peice)", "Veg Chop (2 Pcs)"],
-        "Baked Rasgulla Cups": ["Baked Rasgulla Cup", "Baked Rasgulla Cups (1 pc)", "Baked Rasgulla Cups (1 peice)"],
+        "Baked Rasgulla Cups": ["Baked Rasgulla Cup", "Baked Rasgulla Cups (1 pc)", "Baked Rasgulla Cups (1 peice)", "Baked Rasgulla Cups (1 piece)", "Baked Rasgulla Cups - 1 piece", "Baked Rasgulla Cup (1 piece)"],
+        "Chicken Chap (1 leg piece)": ["Chicken Chap", "Chicken Chaap", "Chicken Chaap (1 leg piece)", "Chicken Chap (1 Leg Piece)"],
     }
 
     for canonical_name, alias_list in aliases.items():
@@ -195,19 +196,34 @@ def init_db():
                     c.execute("UPDATE products SET name=? WHERE id=?", (canonical_name, alias_row["id"]))
                     can_row = alias_row
 
+    # Migration: Remove Egg Roll from active menu
+    egg_roll_row = c.execute("SELECT id FROM products WHERE name='Egg Roll'").fetchone()
+    if egg_roll_row:
+        c.execute("DELETE FROM menu_dates WHERE product_id=?", (egg_roll_row["id"],))
+        c.execute("UPDATE products SET available=0 WHERE id=?", (egg_roll_row["id"],))
+
+    # Migration: Remove Chicken Biriyani completely from menu dates and products
+    cb_row = c.execute("SELECT id FROM products WHERE name='Chicken Biriyani'").fetchone()
+    if cb_row:
+        c.execute("DELETE FROM menu_dates WHERE product_id=?", (cb_row["id"],))
+        has_orders = c.execute("SELECT 1 FROM order_items WHERE product_id=?", (cb_row["id"],)).fetchone()
+        if not has_orders:
+            c.execute("DELETE FROM products WHERE id=?", (cb_row["id"],))
+        else:
+            c.execute("UPDATE products SET available=0 WHERE id=?", (cb_row["id"],))
+
     products = [
-        ("Egg Roll", "Bengali-style egg roll", 79, 30, "IN"),
         ("Egg-Chicken Roll", "Egg and chicken roll", 120, 40, "IN"),
         ("Egg-Mutton Roll", "Egg and mutton roll", 175, 30, "IN"),
         ("Chilli Chicken / Manchurian", "Chilli chicken / Manchurian", 180, 50, "IN"),
-        ("Egg Chowmein", "Bengali-style egg chowmein", 130, 50, "IN"),
-        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 150, 50, "IN"),
+        ("Egg Chowmein", "Bengali-style egg chowmein", 150, 50, "IN"),
+        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 180, 50, "IN"),
+        ("Chicken Chap (1 leg piece)", "Slow-cooked Kolkata-style chicken chap (1 leg piece)", 190, 50, "OUT"),
         ("Mutton Biriyani", "Mutton biriyani", 450, 50, "OUT"),
-        ("Chicken Biriyani", "Chicken biriyani", 300, 50, "OUT"),
         ("Singara", "Crispy Bengali singara", 80, 50, "OUT"),
         ("Egg Devil", "Bengali egg devil", 120, 50, "OUT"),
         ("Chicken Cutlet", "Crispy Bengali chicken cutlet", 150, 50, "OUT"),
-        ("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 150, 50, "OUT"),
+        ("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 160, 50, "OUT"),
         ("Bhetki Fish Fry", "Crispy Bengali Bhetki fish fry (single serving)", 150, 50, "OUT"),
         ("Luchi + Mutton Curry", "Combo: 4 pcs Luchi, 2 pcs Mutton", 280, 50, "OUT"),
         ("Luchi + Mutton Ghugni", "Combo: Luchi with Mutton Ghugni", 200, 50, "OUT"),
@@ -217,20 +233,19 @@ def init_db():
         ("Egg Fried Rice", "Kolkata-style egg fried rice", 150, 50, "IN"),
         ("Egg Chicken Fried Rice", "Kolkata-style egg chicken fried rice", 175, 50, "IN"),
         ("Mixed Fried Rice", "Special mixed fried rice with egg, chicken and prawns", 250, 50, "IN"),
-        ("Baked Rasgulla Cups", "Decadent baked rasgulla in a cup (1 pc)", 100, 50, "OUT"),
-        ("Chilled Mishti Doi", "Classic Bengali sweet curd, served chilled", 80, 50, "OUT"),
+        ("Baked Rasgulla Cups", "Decadent baked rasgulla in a cup (1 pc)", 90, 50, "OUT"),
+        ("Chilled Mishti Doi", "Classic Bengali sweet curd, served chilled", 100, 50, "OUT"),
         ("Makha Sandesh", "Soft, freshly churned Bengali sandesh", 80, 50, "OUT"),
         ("Mihidana Rabri", "Mihidana soaked in rich, creamy rabri (1 pc)", 100, 50, "OUT"),
     ]
     dates = {
-        "Egg Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg-Chicken Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg-Mutton Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Chilli Chicken / Manchurian": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg Chicken Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Chicken Chap (1 leg piece)": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Mutton Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Chicken Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Singara": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Egg Devil": ["2026-10-17", "2026-10-19"],
         "Chicken Cutlet": ["2026-10-17", "2026-10-20"],
@@ -244,8 +259,8 @@ def init_db():
         "Egg Fried Rice": ["2026-10-19"],
         "Egg Chicken Fried Rice": ["2026-10-19"],
         "Mixed Fried Rice": ["2026-10-19"],
-        "Baked Rasgulla Cups": ["2026-10-19", "2026-10-21"],
-        "Chilled Mishti Doi": ["2026-10-19", "2026-10-20"],
+        "Baked Rasgulla Cups": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21"],
+        "Chilled Mishti Doi": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Makha Sandesh": ["2026-10-21"],
         "Mihidana Rabri": ["2026-10-21"],
     }
