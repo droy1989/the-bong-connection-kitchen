@@ -1643,7 +1643,7 @@
 
             const name = (p.name || "").toLowerCase().trim();
 
-            if (name.includes('chap') || name.includes('chaap')) return '/static/images/chickenchap.jpeg';
+            if (name.includes('chap') || name.includes('chaap')) return '/static/images/chickenchap.jpeg?v=1';
             if (name.includes('mixed') && name.includes('rice')) return '/static/images/MixedFriedRice.jpeg';
             if (name.includes('egg') && name.includes('chicken') && name.includes('rice')) return '/static/images/EggChickenFriedRice.jpeg';
             if (name.includes('egg') && name.includes('rice')) return '/static/images/EggFriedRice.jpeg';
@@ -1903,7 +1903,7 @@
 
                             <div class="row">
 
-                                <img src="${getImgUrl(p)}" alt="${escapeHtml(p.name)}" class="item-thumb" onerror="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&auto=format&fit=crop&q=80'">
+                                <img src="${getImgUrl(p)}" alt="${escapeHtml(p.name)}" class="item-thumb" onerror="if(this.src.includes('chickenchap.jpeg')){this.src='/static/images/chickenchap.jpg';}else{this.onerror=null;this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=150&auto=format&fit=crop&q=80';}">
 
                                 <div class="item-info">
 
