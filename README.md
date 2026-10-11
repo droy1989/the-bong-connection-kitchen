@@ -98,20 +98,19 @@ The app is preloaded with the festive 16–20 October 2026 Durga Puja menu and p
 - Egg Chicken Chowmein — ₹180 — demand 50 — sourcing IN
 - Chicken Chap (1 leg piece) — ₹190 — demand 50 — sourcing OUT
 - Mutton Biriyani — ₹450 — demand 50 — sourcing OUT
-- Singara — ₹80 — demand 50 — sourcing OUT
+- Singara — ₹80 — demand 50 — sourcing OUT (Available 16–19 Oct; not served on Navami)
 - Baked Rasgulla Cups — ₹90 (1 pc) — demand 50 — sourcing OUT (Available all days 16–21 Oct)
 - Chilled Mishti Doi — ₹100 — demand 50 — sourcing OUT (Available all days 16–20 Oct)
 
 **Festival Specials & Featured Offerings:**
-- Egg Devil — ₹120 — demand 50 — sourcing OUT (17 Oct Saptami, 19 Oct Ashtami)
+- Egg Devil (2 pcs) — ₹130 — demand 50 — sourcing OUT (17 Oct Saptami, 19 Oct Ashtami)
 - Chicken Cutlet — ₹150 — demand 50 — sourcing OUT (17 Oct Saptami, 20 Oct Navami)
 - Gandhoraj Fish Fry — ₹160 (single serving) — demand 50 — sourcing OUT (16 Oct Sasti, 19 Oct Ashtami, 20 Oct Navami)
 - Bhetki Fish Fry — ₹150 (single serving) — demand 50 — sourcing OUT (18 Oct Saptami)
-- Luchi + Mutton Curry — ₹280 (Combo: 4 pcs Luchi, 2 pcs Mutton) — demand 50 — sourcing OUT (18, 20 Oct)
-- Mutton Curry (3 Pcs Mutton) — ₹300 — demand 50 — sourcing OUT (18, 20 Oct)
+- Luchi + Mutton Curry — ₹350 (Combo: 4 pcs Luchi, 2 pcs Mutton) — demand 50 — sourcing OUT (18, 20 Oct)
+- Mutton Curry (3 Pcs Mutton) — ₹350 — demand 50 — sourcing OUT (18, 20 Oct)
 - Basanti Polao + Mutton Curry — ₹450 (Combo: Basanti Polao with 2 pcs Mutton) — demand 50 — sourcing OUT (18, 20 Oct)
 - Veg Chop — ₹100 (2 pcs) — demand 50 — sourcing OUT (19 Oct)
-- Egg Fried Rice — ₹150 — demand 50 — sourcing IN (19 Oct)
 - Egg Chicken Fried Rice — ₹175 — demand 50 — sourcing IN (19 Oct)
 - Mixed Fried Rice — ₹250 — demand 50 — sourcing IN (19 Oct)
 
