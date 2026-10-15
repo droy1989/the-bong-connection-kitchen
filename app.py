@@ -165,16 +165,23 @@ def init_db():
 
     # Aliases
     aliases = {
-        "Egg-Mutton Roll": ["Egg Mutton Roll"],
-        "Gandhoraj Fish Fry": ["Gandhoraj Fish Fry (Single Serving)"],
-        "Chilled Mishti Doi": ["Chilled Misto Doi", "Misto Doi", "Mishti Doi", "Chilled Misti Doi", "Chilled Misti doi", "Misti Doi", "Misti doi"],
+        "Egg Chicken Roll": ["Egg-Chicken Roll", "Chicken Egg Roll"],
+        "Egg Mutton Roll": ["Egg-Mutton Roll"],
+        "Beetroot Veg Chop (2 pcs)": ["Veg Chop", "Veg Chop (2 pcs)", "Veg Chop (2 peice)", "Veg Chop (2 Pcs)", "Beetroot Veg Chop"],
+        "Chicken Manchurian": ["Chilli Chicken / Manchurian", "Chilli Chicken", "Manchurian"],
+        "Singhara (2 pcs)": ["Singara", "Singhara"],
+        "Egg Chicken Chowmein": ["Egg Chicken Chowmein"],
+        "Mix Fried Rice": ["Mixed Fried Rice"],
+        "Mutton Biryani (with Egg & Aloo)": ["Mutton Biriyani", "Mutton Biryani", "Mutton Biryani (with Egg &)"],
+        "Chicken Chap (2 pcs)": ["Chicken Chap (1 leg piece)", "Chicken Chap", "Chicken Chaap", "Chicken Chaap (1 leg piece)", "Chicken Chap (1 Leg Piece)"],
+        "Baked Rosogolla (2 pcs)": ["Baked Rasgulla Cups", "Baked Rasgulla Cup", "Baked Rasgulla Cups (1 pc)", "Baked Rasgulla Cups (1 peice)", "Baked Rasgulla Cups (1 piece)", "Baked Rasgulla Cups - 1 piece", "Baked Rasgulla Cup (1 piece)", "Baked Rosogolla"],
+        "Chilled Mishti Doi (1 cup)": ["Chilled Mishti Doi", "Chilled Misto Doi", "Misto Doi", "Mishti Doi", "Chilled Misti Doi", "Chilled Misti doi", "Misti Doi", "Misti doi"],
+        "Fish Fry": ["Gandhoraj Fish Fry", "Gandhoraj Fish Fry (Single Serving)", "Bhetki Fish Fry", "Bhetki Fish Fry (Single Serving)"],
         "Luchi + Mutton Curry": ["Luchi + Mutton Curry (4 pcs Luchi, 2 pcs mutton)", "Luchi + Mutton Curry Combo", "Luchi + Mutton Curry (4 Pcs Luchi, 2 Pcs Mutton)", "Combo: Luchi + Mutton Curry"],
         "Basanti Polao + Mutton Curry": ["Basanti Polao + Mutton Curry Combo", "Basanti Polao + Mutton Curry(2 peice mutton)", "Basanti Polao + Mutton Curry (2 Pcs Mutton)", "Combo: Basanti Polao + Mutton Curry"],
         "Mutton Curry (3 Pcs Mutton)": ["Mutton Curry", "Mutton Curry (3 Pcs)", "Mutton Curry( 3 peice Mutton)", "Mutton Curry (3 pcs Mutton)"],
-        "Veg Chop": ["Veg Chop (2 pcs)", "Veg Chop (2 peice)", "Veg Chop (2 Pcs)"],
-        "Baked Rasgulla Cups": ["Baked Rasgulla Cup", "Baked Rasgulla Cups (1 pc)", "Baked Rasgulla Cups (1 peice)", "Baked Rasgulla Cups (1 piece)", "Baked Rasgulla Cups - 1 piece", "Baked Rasgulla Cup (1 piece)"],
-        "Chicken Chap (1 leg piece)": ["Chicken Chap", "Chicken Chaap", "Chicken Chaap (1 leg piece)", "Chicken Chap (1 Leg Piece)"],
         "Egg Devil (2 pcs)": ["Egg Devil", "Egg Devil (2 piece)", "Egg Devil (2 pcs)", "Egg Devil (2 Pcs)", "Egg Devil ( 2 piece)"],
+        "Malai Chamcham (1 piece)": ["Malai Chamcham", "Malai Chamcham (1 peice)", "Malai Cham Cham", "Chamcham"],
     }
 
     for canonical_name, alias_list in aliases.items():
@@ -219,65 +226,55 @@ def init_db():
         c.execute("DELETE FROM menu_dates WHERE product_id=?", (efr_row["id"],))
         c.execute("UPDATE products SET available=0 WHERE id=?", (efr_row["id"],))
 
-    # Migration: Remove Singara from Navami (2026-10-20)
-    singara_row = c.execute("SELECT id FROM products WHERE name='Singara'").fetchone()
-    if singara_row:
-        c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date='2026-10-20'", (singara_row["id"],))
-
-    # Migration: Ensure Veg Chop is not on Navami (2026-10-20)
-    veg_chop_row = c.execute("SELECT id FROM products WHERE name='Veg Chop'").fetchone()
-    if veg_chop_row:
-        c.execute("DELETE FROM menu_dates WHERE product_id=? AND menu_date='2026-10-20'", (veg_chop_row["id"],))
+    ALL_DAYS = ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21"]
 
     products = [
-        ("Egg-Chicken Roll", "Egg and chicken roll", 120, 40, "IN"),
-        ("Egg-Mutton Roll", "Egg and mutton roll", 175, 30, "IN"),
-        ("Chilli Chicken / Manchurian", "Chilli chicken / Manchurian", 180, 50, "IN"),
+        ("Egg Chicken Roll", "Egg and chicken roll", 150, 40, "IN"),
+        ("Egg Mutton Roll", "Egg and mutton roll", 200, 30, "IN"),
+        ("Beetroot Veg Chop (2 pcs)", "Crispy Kolkata-style beetroot vegetable chop (2 pcs)", 75, 50, "OUT"),
+        ("Chicken Manchurian", "Chicken Manchurian", 250, 50, "IN"),
+        ("Singhara (2 pcs)", "Crispy Bengali singhara (2 pcs)", 75, 50, "OUT"),
+        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 250, 50, "IN"),
+        ("Mix Fried Rice", "Special mixed fried rice with egg, chicken and prawns", 280, 50, "IN"),
+        ("Mutton Biryani (with Egg & Aloo)", "Kolkata-style mutton biryani with egg and aloo", 450, 50, "OUT"),
+        ("Chicken Chap (2 pcs)", "Slow-cooked Kolkata-style chicken chap (2 pcs)", 280, 50, "OUT"),
+        ("Baked Rosogolla (2 pcs)", "Decadent baked rosogolla (2 pcs)", 80, 50, "OUT"),
+        ("Chilled Mishti Doi (1 cup)", "Classic Bengali sweet curd, served chilled (1 cup)", 100, 50, "OUT"),
         ("Egg Chowmein", "Bengali-style egg chowmein", 150, 50, "IN"),
-        ("Egg Chicken Chowmein", "Bengali-style egg chicken chowmein", 180, 50, "IN"),
-        ("Chicken Chap (1 leg piece)", "Slow-cooked Kolkata-style chicken chap (1 leg piece)", 190, 50, "OUT"),
-        ("Mutton Biriyani", "Mutton biriyani", 450, 50, "OUT"),
-        ("Singara", "Crispy Bengali singara", 80, 50, "OUT"),
         ("Egg Devil (2 pcs)", "Bengali egg devil (2 pcs)", 130, 50, "OUT"),
         ("Chicken Cutlet", "Crispy Bengali chicken cutlet", 150, 50, "OUT"),
-        ("Gandhoraj Fish Fry", "Crispy Gandhoraj fish fry (single serving)", 160, 50, "OUT"),
-        ("Bhetki Fish Fry", "Crispy Bengali Bhetki fish fry (single serving)", 150, 50, "OUT"),
+        ("Fish Fry", "Crispy fish fry (single serving)", 160, 50, "OUT"),
         ("Luchi + Mutton Curry", "Combo: 4 pcs Luchi, 2 pcs Mutton", 350, 50, "OUT"),
         ("Luchi + Mutton Ghugni", "Combo: Luchi with Mutton Ghugni", 200, 50, "OUT"),
         ("Mutton Curry (3 Pcs Mutton)", "Rich Bengali mutton curry (3 pcs Mutton)", 350, 50, "OUT"),
         ("Basanti Polao + Mutton Curry", "Combo: Basanti Polao with 2 pcs Mutton", 450, 50, "OUT"),
-        ("Veg Chop", "Crispy Kolkata-style vegetable chop (2 pcs)", 100, 50, "OUT"),
         ("Egg Chicken Fried Rice", "Kolkata-style egg chicken fried rice", 175, 50, "IN"),
-        ("Mixed Fried Rice", "Special mixed fried rice with egg, chicken and prawns", 250, 50, "IN"),
-        ("Baked Rasgulla Cups", "Decadent baked rasgulla in a cup (1 pc)", 90, 50, "OUT"),
-        ("Chilled Mishti Doi", "Classic Bengali sweet curd, served chilled", 100, 50, "OUT"),
         ("Makha Sandesh", "Soft, freshly churned Bengali sandesh", 80, 50, "OUT"),
-        ("Mihidana Rabri", "Mihidana soaked in rich, creamy rabri (1 pc)", 100, 50, "OUT"),
+        ("Malai Chamcham (1 piece)", "Soft, creamy Bengali malai chamcham (1 piece)", 75, 50, "OUT"),
     ]
     dates = {
-        "Egg-Chicken Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Egg-Mutton Roll": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Chilli Chicken / Manchurian": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
+        "Egg Chicken Roll": ALL_DAYS,
+        "Egg Mutton Roll": ALL_DAYS,
+        "Beetroot Veg Chop (2 pcs)": ALL_DAYS,
+        "Chicken Manchurian": ALL_DAYS,
+        "Singhara (2 pcs)": ALL_DAYS,
+        "Egg Chicken Chowmein": ALL_DAYS,
+        "Mix Fried Rice": ALL_DAYS,
+        "Mutton Biryani (with Egg & Aloo)": ALL_DAYS,
+        "Chicken Chap (2 pcs)": ALL_DAYS,
+        "Baked Rosogolla (2 pcs)": ALL_DAYS,
+        "Chilled Mishti Doi (1 cup)": ALL_DAYS,
         "Egg Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Egg Chicken Chowmein": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Chicken Chap (1 leg piece)": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Mutton Biriyani": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
-        "Singara": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19"],
         "Egg Devil (2 pcs)": ["2026-10-17", "2026-10-19"],
         "Chicken Cutlet": ["2026-10-17", "2026-10-20"],
-        "Gandhoraj Fish Fry": ["2026-10-16", "2026-10-19", "2026-10-20"],
-        "Bhetki Fish Fry": ["2026-10-18"],
+        "Fish Fry": ["2026-10-16", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Luchi + Mutton Curry": ["2026-10-18", "2026-10-20"],
         "Luchi + Mutton Ghugni": ["2026-10-21"],
         "Mutton Curry (3 Pcs Mutton)": ["2026-10-18", "2026-10-20"],
         "Basanti Polao + Mutton Curry": ["2026-10-18", "2026-10-20"],
-        "Veg Chop": ["2026-10-19"],
         "Egg Chicken Fried Rice": ["2026-10-19"],
-        "Mixed Fried Rice": ["2026-10-19"],
-        "Baked Rasgulla Cups": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21"],
-        "Chilled Mishti Doi": ["2026-10-16", "2026-10-17", "2026-10-18", "2026-10-19", "2026-10-20"],
         "Makha Sandesh": ["2026-10-21"],
-        "Mihidana Rabri": ["2026-10-21"],
+        "Malai Chamcham (1 piece)": ALL_DAYS,
     }
 
     for name, desc, price, demand, sourcing in products:

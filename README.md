@@ -88,42 +88,34 @@ Fresh Lime 50
 
 ## The Bong Connection menu
 
-The app is preloaded with the festive 16–20 October 2026 Durga Puja menu and prices:
+The app is preloaded with the festive Durga Puja (16–21 October 2026) menu and prices:
 
-**All-Day Staples (16–20 Oct):**
-- Egg-Chicken Roll — ₹120 — demand 40 — sourcing IN
-- Egg-Mutton Roll — ₹175 — demand 30 — sourcing IN
-- Chilli Chicken / Manchurian — ₹180 — demand 50 — sourcing IN
-- Egg Chowmein — ₹150 — demand 50 — sourcing IN
-- Egg Chicken Chowmein — ₹180 — demand 50 — sourcing IN
-- Chicken Chap (1 leg piece) — ₹190 — demand 50 — sourcing OUT
-- Mutton Biriyani — ₹450 — demand 50 — sourcing OUT
-- Singara — ₹80 — demand 50 — sourcing OUT (Available 16–19 Oct; not served on Navami)
-- Baked Rasgulla Cups — ₹90 (1 pc) — demand 50 — sourcing OUT (Available all days 16–21 Oct)
-- Chilled Mishti Doi — ₹100 — demand 50 — sourcing OUT (Available all days 16–20 Oct)
+**All-Day Menu (Available All Days 16–21 Oct):**
+- Egg Chicken Roll — ₹150 — demand 40 — sourcing IN
+- Egg Mutton Roll — ₹200 — demand 30 — sourcing IN
+- Beetroot Veg Chop (2 pcs) — ₹75 — demand 50 — sourcing OUT
+- Chicken Manchurian — ₹250 — demand 50 — sourcing IN
+- Singhara (2 pcs) — ₹75 — demand 50 — sourcing OUT
+- Egg Chicken Chowmein — ₹250 — demand 50 — sourcing IN
+- Mix Fried Rice — ₹280 — demand 50 — sourcing IN
+- Mutton Biryani (with Egg & Aloo) — ₹450 — demand 50 — sourcing OUT
+- Chicken Chap (2 pcs) — ₹280 — demand 50 — sourcing OUT
+- Baked Rosogolla (2 pcs) — ₹80 — demand 50 — sourcing OUT
+- Chilled Mishti Doi (1 cup) — ₹100 — demand 50 — sourcing OUT
+- Malai Chamcham (1 piece) — ₹75 — demand 50 — sourcing OUT
 
 **Festival Specials & Featured Offerings:**
+- Egg Chowmein — ₹150 — demand 50 — sourcing IN (16–20 Oct)
 - Egg Devil (2 pcs) — ₹130 — demand 50 — sourcing OUT (17 Oct Saptami, 19 Oct Ashtami)
 - Chicken Cutlet — ₹150 — demand 50 — sourcing OUT (17 Oct Saptami, 20 Oct Navami)
-- Gandhoraj Fish Fry — ₹160 (single serving) — demand 50 — sourcing OUT (16 Oct Sasti, 19 Oct Ashtami, 20 Oct Navami)
-- Bhetki Fish Fry — ₹150 (single serving) — demand 50 — sourcing OUT (18 Oct Saptami)
+- Fish Fry — ₹160 (single serving) — demand 50 — sourcing OUT (16 Oct Sasthi, 18 Oct Saptami, 19 Oct Ashtami, 20 Oct Navami)
 - Luchi + Mutton Curry — ₹350 (Combo: 4 pcs Luchi, 2 pcs Mutton) — demand 50 — sourcing OUT (18, 20 Oct)
 - Mutton Curry (3 Pcs Mutton) — ₹350 — demand 50 — sourcing OUT (18, 20 Oct)
 - Basanti Polao + Mutton Curry — ₹450 (Combo: Basanti Polao with 2 pcs Mutton) — demand 50 — sourcing OUT (18, 20 Oct)
-- Veg Chop — ₹100 (2 pcs) — demand 50 — sourcing OUT (19 Oct)
 - Egg Chicken Fried Rice — ₹175 — demand 50 — sourcing IN (19 Oct)
-- Mixed Fried Rice — ₹250 — demand 50 — sourcing IN (19 Oct)
-
-Note: the supplied "REVENUE" values were used as item prices because DEMAND × REVENUE equals the supplied total for every row.
-
+- Luchi + Mutton Ghugni — ₹200 — demand 50 — sourcing OUT (21 Oct Dasami)
+- Makha Sandesh — ₹80 — demand 50 — sourcing OUT (21 Oct Dasami)
 
 ## Updated kitchen workflow
 
 Kitchen uses `/admin`: PAID -> START -> PREPARING -> READY -> DELIVERED. The `/display` page auto-refreshes every 3 seconds, announces READY tokens as NOW SERVING, and lists WAITING/PREPARING tokens as GETTING READY. Customers can monitor `/order.html?id=...`.
-
-
-### Added Puja Day — 21 Oct (Dasami)
-- Luchi + Mutton Ghugni — ₹200
-- Baked Rasgulla Cups — ₹90
-- Makha Sandesh — ₹80
-- Mihidana Rabri — ₹100 (1 piece)

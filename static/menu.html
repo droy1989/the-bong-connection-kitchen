@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>The Bong Connection • Durga Puja</title>
-    <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
-    <link rel="icon" href="/static/icons/favicon-16.png" sizes="16x16">
+    <link rel="icon" href="/static/images/favicon-32.png" sizes="32x32">
+    <link rel="icon" href="/static/images/favicon-16.png" sizes="16x16">
     <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 
     <!-- Google Fonts -->
@@ -1644,25 +1644,26 @@
             const name = (p.name || "").toLowerCase().trim();
 
             if (name.includes('chap') || name.includes('chaap')) return '/static/images/chickenchap.jpeg?v=1';
-            if (name.includes('mixed') && name.includes('rice')) return '/static/images/MixedFriedRice.jpeg';
+            if (name.includes('mix') && name.includes('rice')) return '/static/images/MixedFriedRice.jpeg';
             if (name.includes('egg') && name.includes('chicken') && name.includes('rice')) return '/static/images/EggChickenFriedRice.jpeg';
             if (name.includes('egg') && name.includes('rice')) return '/static/images/EggFriedRice.jpeg';
-            if (name.includes('veg') && name.includes('chop')) return '/static/images/VegChop.jpeg';
+            if ((name.includes('veg') && name.includes('chop')) || name.includes('beetroot')) return '/static/images/VegChop.jpeg';
             if (name.includes('makha') && name.includes('sandesh')) return '/static/images/MakhaSandesh.jpeg';
             if (name.includes('mihidana') && name.includes('rabri')) return '/static/images/MihidanaRabri.jpeg';
-            if (name.includes('baked') && name.includes('rasgulla')) return '/static/images/BakedRasgullacups.jpeg';
+            if (name.includes('chamcham') || name.includes('cham cham')) return '/static/images/MalaiChamCham.jpg';
+            if (name.includes('baked') && (name.includes('rasgulla') || name.includes('rosogolla'))) return '/static/images/BakedRasgullacups.jpeg';
             if ((name.includes('mishti') || name.includes('misti')) && name.includes('doi')) return '/static/images/ChilledMishtiDoi.jpeg';
             if (name.includes('luchi') && name.includes('ghugni')) return '/static/images/LuchiMuttonGhugni.jpeg';
-            if (name.includes('mutton') && name.includes('biriyani')) return '/static/images/Mutton-Biriyani.jpeg';
-            if (name.includes('chicken') && name.includes('biriyani')) return '/static/images/Chicken-Biriyani.jpeg';
+            if (name.includes('mutton') && (name.includes('biriyani') || name.includes('biryani'))) return '/static/images/Mutton-Biriyani.jpeg';
+            if (name.includes('chicken') && (name.includes('biriyani') || name.includes('biryani'))) return '/static/images/Chicken-Biriyani.jpeg';
             if (name.includes('chicken') && name.includes('egg') && name.includes('roll')) return '/static/images/Chicken-egg-roll.jpg';
             if (name.includes('mutton') && name.includes('roll')) return '/static/images/Egg-Mutton.jpeg';
             if (name.includes('egg roll')) return '/static/images/egg-roll.jpg';
-            if (name.includes('chilli chicken')) return '/static/images/Chilli-Chicken.jpeg';
+            if (name.includes('chilli chicken') || name.includes('manchurian')) return '/static/images/Chilli-Chicken.jpeg';
             if (name.includes('chicken') && (name.includes('chow') || name.includes('chowmein'))) return '/static/images/eggchickenchowmein.jpeg';
             if (name.includes('egg') && (name.includes('chow') || name.includes('chowmein'))) return '/static/images/Egg-Chowmein.webp';
-            if (name.includes('gandoraj') || name.includes('fish fry')) return '/static/images/Gandoraj-Fish-Fry.jpeg';
-            if (name.includes('singara') || name.includes('samosa')) return '/static/images/Singara.jpeg';
+            if (name.includes('gandoraj') || name.includes('gandhoraj') || name.includes('fish fry')) return '/static/images/Gandoraj-Fish-Fry.jpeg';
+            if (name.includes('singara') || name.includes('singhara') || name.includes('samosa')) return '/static/images/Singara.jpeg';
             if (name.includes('egg') && name.includes('devil')) return '/static/images/Egg-Devil.jpeg';
             if (name.includes('chicken') && name.includes('cutlet')) return '/static/images/Chicken-Cutlet.jpeg';
             if (name.includes('basanti') && name.includes('polao')) return '/static/images/BasantiPolaoMC.jpeg';
